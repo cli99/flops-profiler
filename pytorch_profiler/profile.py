@@ -1,6 +1,4 @@
-import sys
 import time
-import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -9,16 +7,15 @@ from functools import partial
 
 module_flop_count = []
 
-# https://pytorch.org/docs/stable/F.html
+
+def prod(dims):
+    p = 1
+    for v in dims:
+        p *= v
+    return p
 
 
 def linear_flops_compute(input, weight, bias=None):
-    """
-    input: (N, *, in_features) where * means any number of additional dimensions
-    weight: (out_features, in_features)
-    bias: (out_features)
-    output: (N, *, out_features)
-    """
     out_features = weight.shape[0]
     return torch.numel(input) * out_features
 
@@ -44,15 +41,6 @@ def conv_flops_compute(input,
                        padding=0,
                        dilation=1,
                        groups=1):
-    """
-    input – input tensor of shape (minibatch , in_channels , iH , iW)
-    weight – filters of shape (out_channels , in_channels/groups , kH , kW)
-    bias – optional bias tensor of shape(out_channels) . Default: None
-    stride – the stride of the convolving kernel. Can be a single number or a tuple (sH, sW). Default: 1
-    padding – implicit paddings on both sides of the input. Can be a single number or a tuple (padH, padW). Default: 0
-    dilation – the spacing between kernel elements. Can be a single number or a tuple (dH, dW). Default: 1
-    groups – split input into groups, in_channelsin_channels should be divisible by the number of groups. Default: 1
-    """
     assert weight.shape[1] * groups == input.shape[1]
 
     batch_size = input.shape[0]
@@ -75,8 +63,8 @@ def conv_flops_compute(input,
 
     filters_per_channel = out_channels // groups
     conv_per_position_flops = int(
-        np.prod(kernel_dims)) * in_channels * filters_per_channel
-    active_elements_count = batch_size * int(np.prod(output_dims))
+        prod(kernel_dims)) * in_channels * filters_per_channel
+    active_elements_count = batch_size * int(prod(output_dims))
     overall_conv_flops = conv_per_position_flops * active_elements_count
 
     bias_flops = 0
@@ -116,8 +104,8 @@ def conv_trans_flops_compute(input,
 
     filters_per_channel = out_channels // groups
     conv_per_position_flops = int(
-        np.prod(kernel_dims)) * in_channels * filters_per_channel
-    active_elements_count = batch_size * int(np.prod(input_dims))
+        prod(kernel_dims)) * in_channels * filters_per_channel
+    active_elements_count = batch_size * int(prod(input_dims))
     overall_conv_flops = conv_per_position_flops * active_elements_count
 
     bias_flops = 0
@@ -188,27 +176,6 @@ def wrapFunc(func, funcFlopCompute):
     return newFunc
 
 
-# def wrapModule(func, funcFlopCompute):
-#     oldFunc = func
-
-#     def newFunc(*args, **kwds):
-#         flops = funcFlopCompute(*args, **kwds)
-#         name = "nn.functional." + func.__name__
-#         module_flop_count.append((name, flops))
-#         return oldFunc(*args, **kwds)
-
-#     return newFunc
-
-# FUNCS_MAPPING = {
-#     F.avg_pool2d: pool_flops_compute,
-#     F.linear: linear_flops_compute,
-#     F.conv2d: conv_flops_compute
-# }
-#
-# for f in FUNCS_MAPPING:
-#     print(f.__name__)
-#     setattr(sys.modules[f.__module__], f.__name__, wrapFunc(f, FUNCS_MAPPING[f]))
-
 # FC
 F.linear = wrapFunc(F.linear, linear_flops_compute)
 
@@ -255,11 +222,6 @@ F.softmax = wrapFunc(F.softmax, softmax_flops_compute)
 
 # embedding
 F.embedding = wrapFunc(F.embedding, embedding_flops_compute)
-
-# dropout, NOT SUPPORTED
-# F.dropout = wrapFunc(F.dropout, dropout_flops_compute)
-# F.dropout2d = wrapFunc(F.dropout2d, dropout_flops_compute)
-# F.dropout3d = wrapFunc(F.dropout3d, dropout_flops_compute)
 
 
 def rnn_forward_hook(rnn_module, input, output):
@@ -328,22 +290,25 @@ def get_model_parameters_number(model):
     return params_num
 
 
-def add_flops_counting_methods(model):
+def add_profile_methods(model):
     # adding additional methods to the existing module object,
     # this is done this way so that each function has access to self object
-    model.start_flops_count = start_flops_count.__get__(model)
-    model.stop_flops_count = stop_flops_count.__get__(model)
-    model.reset_flops_count = reset_flops_count.__get__(model)
-    model.compute_total_flops_count = compute_total_flops_count.__get__(model)
+    model.start_profile = start_profile.__get__(model)
+    model.stop_profile = stop_profile.__get__(model)
+    model.reset_profile = reset_profile.__get__(model)
+    model.compute_total_flops = compute_total_flops.__get__(model)
     model.compute_total_duration = compute_total_duration.__get__(model)
 
-    model.reset_flops_count()
+    model.reset_profile()
 
     return model
 
 
-def start_flops_count(self, **kwargs):
-    def register_module_hooks(module, verbose, ost, ignore_list):
+def start_profile(self, **kwargs):
+    def register_module_hooks(module, ignore_list):
+        if type(module) in ignore_list:
+            return
+
         # if compute the flops of a module directly
         if type(module) in MODULE_HOOK_MAPPING:
             module.__flops_handle__ = module.register_forward_hook(
@@ -364,7 +329,6 @@ def start_flops_count(self, **kwargs):
 
         def post_hook(module, input, output):
             module.__flops__ = sum([elem[1] for elem in module_flop_count])
-            # module.__flops__ += sum([child.__flops__ for child in module.children()])
             module_flop_count.clear()
 
         has_children = len(module._modules.items()) != 0
@@ -395,11 +359,11 @@ def add_or_reset_attrs(module):
     module.__end_time__ = 0
 
 
-def reset_flops_count(self):
+def reset_profile(self):
     self.apply(add_or_reset_attrs)
 
 
-def remove_flops_count_attrs(module):
+def remove_profile_attrs(module):
     if hasattr(module, '__batch__'):
         del module.__batch__
     if hasattr(module, '__flops__'):
@@ -427,7 +391,7 @@ def remove_flops_count_attrs(module):
         del module.__end_time_hook_handle__
 
 
-def compute_total_flops_count(self):
+def compute_total_flops(self):
     sum = 0
     for module in self.modules():
         sum += module.__flops__
@@ -441,8 +405,8 @@ def compute_total_duration(self):
     return sum
 
 
-def stop_flops_count(self):
-    self.apply(remove_flops_count_attrs)
+def stop_profile(self):
+    self.apply(remove_profile_attrs)
 
 
 def flops_to_string(flops, units=None, precision=2):
@@ -502,13 +466,12 @@ def duration_to_string(duration, units=None, precision=2):
             return str(round(duration, precision)) + ' s'
 
 
-def print_model_with_flops(model,
-                           total_flops,
-                           total_params,
-                           total_duration,
-                           units=None,
-                           precision=3,
-                           ost=sys.stdout):
+def print_model_profile(model,
+                        total_flops,
+                        total_params,
+                        total_duration,
+                        units=None,
+                        precision=3):
     def accumulate_flops(self):
         has_children = len(self._modules.items()) != 0
         if not has_children:
@@ -556,15 +519,15 @@ def print_model_with_flops(model,
             del m.accumulate_flops
 
     model.apply(add_extra_repr)
-    print(model, file=ost)
+    print(model)
     model.apply(del_extra_repr)
 
 
-def print_aggregated_info(model, depth=-1, top_num=3, ost=sys.stdout):
+def print_model_aggregated_profile(model, depth=-1, top_num=3):
     info = {}
     if not hasattr(model, '__flops__'):
         print(
-            "no __flops__ attribute in the model, call this function after start_flops_count and before stop_flops_count"
+            "no __flops__ attribute in the model, call this function after start_profile and before stop_profile"
         )
         return
 
@@ -618,25 +581,20 @@ def print_aggregated_info(model, depth=-1, top_num=3, ost=sys.stdout):
     print(f"Top {num_items} modules in time at depth {depth} are {sort_time}")
 
 
-def get_model_complexity_info(model,
-                              input_res,
-                              print_per_layer_info=True,
-                              print_module_info=True,
-                              as_strings=True,
-                              input_constructor=None,
-                              ost=sys.stdout,
-                              verbose=False,
-                              ignore_modules=[],
-                              custom_funcs_hooks={},
-                              warm_up=10):
+def get_model_profile(model,
+                      input_res,
+                      print_profile=True,
+                      print_aggregated_profile=True,
+                      as_strings=True,
+                      input_constructor=None,
+                      ignore_modules=[],
+                      warm_up=10):
     assert type(input_res) is tuple
     assert len(input_res) >= 1
     assert isinstance(model, nn.Module)
-    model = add_flops_counting_methods(model)
+    model = add_profile_methods(model)
     model.eval()
-    model.start_flops_count(ost=ost,
-                            verbose=verbose,
-                            ignore_list=ignore_modules)
+    model.start_profile(ignore_list=ignore_modules)
     for _ in range(warm_up):
         if input_constructor:
             input = input_constructor(input_res)
@@ -650,7 +608,7 @@ def get_model_complexity_info(model,
             except StopIteration:
                 batch = torch.ones(()).new_empty((1, *input_res))
             _ = model(batch)
-    model.reset_flops_count()
+    model.reset_profile()
 
     if input_constructor:
         input = input_constructor(input_res)
@@ -665,22 +623,18 @@ def get_model_complexity_info(model,
             batch = torch.ones(()).new_empty((1, *input_res))
         _ = model(batch)
 
-    flops_count = model.compute_total_flops_count()
+    flops = model.compute_total_flops()
     duration = model.compute_total_duration()
     params_count = model.__params__
-    if print_per_layer_info:
-        print_model_with_flops(model,
-                               flops_count,
-                               params_count,
-                               duration,
-                               ost=ost)
-    if print_module_info:
-        print_aggregated_info(model, depth=-1, top_num=3, ost=ost)
-    model.stop_flops_count()
+    if print_profile:
+        print_model_profile(model, flops, params_count, duration)
+    if print_aggregated_profile:
+        print_model_aggregated_profile(model, depth=-1, top_num=3)
+    model.stop_profile()
     if as_strings:
-        return flops_to_string(flops_count), params_to_string(params_count)
+        return flops_to_string(flops), params_to_string(params_count)
 
-    return flops_count, params_count
+    return flops, params_count
 
 
 class LeNet5(nn.Module):
@@ -714,11 +668,11 @@ class LeNet5(nn.Module):
 if __name__ == "__main__":
     mod = LeNet5(10)
     input = torch.randn(3, 1, 32, 32)
-    macs, params = get_model_complexity_info(mod,
-                                             tuple(input.shape)[1:],
-                                             as_strings=True,
-                                             print_per_layer_info=True,
-                                             print_module_info=True,
-                                             verbose=True)
-    print('{:<30}  {:<8}'.format('Computational complexity: ', macs))
+    macs, params = get_model_profile(mod,
+                                     tuple(input.shape)[1:],
+                                     as_strings=True,
+                                     print_profile=True,
+                                     print_aggregated_profile=True,
+                                     ignore_modules=None)
+    print('{:<30}  {:<8}'.format('Number of multiply-adds: ', macs))
     print('{:<30}  {:<8}'.format('Number of parameters: ', params))
