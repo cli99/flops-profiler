@@ -441,22 +441,22 @@ def stop_profile(self):
 def flops_to_string(flops, units=None, precision=2):
     if units is None:
         if flops // 10**9 > 0:
-            return str(round(flops / 10.0**9, precision)) + " GMac"
+            return str(round(flops / 10.0**9, precision)) + " GMACs"
         elif flops // 10**6 > 0:
-            return str(round(flops / 10.0**6, precision)) + " MMac"
+            return str(round(flops / 10.0**6, precision)) + " MMACs"
         elif flops // 10**3 > 0:
-            return str(round(flops / 10.0**3, precision)) + " KMac"
+            return str(round(flops / 10.0**3, precision)) + " KMACs"
         else:
-            return str(flops) + " Mac"
+            return str(flops) + " MACs"
     else:
-        if units == "GMac":
+        if units == "GMACs":
             return str(round(flops / 10.0**9, precision)) + " " + units
-        elif units == "MMac":
+        elif units == "MMACs":
             return str(round(flops / 10.0**6, precision)) + " " + units
-        elif units == "KMac":
+        elif units == "KMACs":
             return str(round(flops / 10.0**3, precision)) + " " + units
         else:
-            return str(flops) + " Mac"
+            return str(flops) + " MACs"
 
 
 def params_to_string(params_num, units=None, precision=2):

@@ -6,7 +6,7 @@
 
 The pytorch-profiler prints the model graph with the measured profile attached to each module, and shows how time, flops and parameters are spent in a PyTorch model and which modules or layers could be the bottleneck. It also outputs the names of the top k modules in terms of aggregated time, flops, and parameters at depth l with k and l specified by the user.
 
-The flops estimation is partly inspired by [ptflops](https://github.com/sovrasov/flops-counter.pytorch) with the major difference being that pytorch-profiler captures ```torch.nn.functional``` invoked in a module to estimate the flops, thus allowing customized modules in the module. pytorch-profiler also supports flops computation at module level (for RNNs).
+The flops estimation is partly inspired by [ptflops](https://github.com/sovrasov/flops-counter.pytorch) with the major difference being that pytorch-profiler captures ```torch.nn.functional``` invoked in a module to estimate the flops, thus allowing customized modules in the module (e.g. ```ParallelTransformerLayerworks, ParallelSelfAttention, RowParallelLinear, etc.``` in [Megatron-LM](https://github.com/NVIDIA/Megatron-LM)). pytorch-profiler also supports flops computation at module level (for RNNs).
 
 Below is an example output for LeNet5:
 <!-- ![](header.png) -->
@@ -40,6 +40,9 @@ Number of multiply-adds:        429.25 KMac
 Number of parameters:           61.71 k
 ```
 
+
+For models running on multi-node or multi-gpu runs, only the model parallelism affects the number of flops and parameters (e.g. ```--model-parallel-size``` in [Megatron-LM](https://github.com/NVIDIA/Megatron-LM)), i.e., model_parallel_size * flops = total_flops, model_parallel_size * parameters = total_parameters. The number of gpus or nodes does not affect the output profile.
+
 ## Installation
 
 From PyPI:
@@ -54,22 +57,23 @@ pip install --upgrade git+https://github.com/sovrasov/pytorch-profiler.git
 
 ## Usage
 
-```
+```python
 import torchvision.models as models
 import torch
 from pytorch_profiler import get_model_profile
 
 with torch.cuda.device(0):
     mod = models.alexnet()
-    macs, params = get_model_profile(mod,
-                                     (3, 224, 224),
-                                     print_profile=True,
-                                     print_aggregated_profile=True,
-                                     depth=-1,
-                                     top_num=3,
-                                     warm_up=10,
-                                     as_strings=True,
-                                     ignore_modules=None)
+    macs, params = get_model_profile(mod, # model
+                                     (3, 224, 224), # input shape or input to the input_constructor
+                                     input_constructor=None, # if specified, a constructor taking the the parameter before is used as input to the model
+                                     print_profile=True, # print model graph with the profile annotated
+                                     print_aggregated_profile=True, # print aggregated profile for top modules
+                                     depth=-1, # depth into the nested modules with -1 being the inner most modules
+                                     top_num=3, # the number of top modules to print aggregated profile
+                                     warm_up=10, # the number of warm-ups before measuring the time of each module
+                                     as_strings=True, # print raw numbers (e.g. 1000) or strings (e.g. 1k)
+                                     ignore_modules=None) # the list of modules to ignore in the profiling
     print('{:<30}  {:<8}'.format('Number of multiply-adds: ', macs))
     print('{:<30}  {:<8}'.format('Number of parameters: ', params))
 ```
