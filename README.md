@@ -1,72 +1,96 @@
 # pytorch-profiler
 
-> Short blurb about what your product does.
+> Measures the time, number of estimated flop and parameters of each module in a PyTorch Model.
 
-# https://pytorch.org/docs/stable/F.html
+[![PyPI version](https://badge.fury.io/py/pytorch-profiler.svg)](https://pypi.org/project/pytorch-profiler/)
 
-[![NPM Version][npm-image]][npm-url]
-[![Build Status][travis-image]][travis-url]
-[![Downloads Stats][npm-downloads]][npm-url]
+The pytorch-profiler prints the model graph with the measured profile attached to each module, and shows how time, flops and parameters are spent in a PyTorch model and which modules or layers could be the bottleneck. It also outputs the names of the top k modules in terms of aggregated time, flops, and parameters at depth l with k and l specified by the user.
 
-One to two paragraph statement about your product and what it does.
+The flops estimation is partly inspired by [ptflops](https://github.com/sovrasov/flops-counter.pytorch) with the major difference being that pytorch-profiler captures ```torch.nn.functional``` invoked in a module to estimate the flops, thus allowing customized modules in the module. pytorch-profiler also supports flops computation at module level (for RNNs).
 
-![](header.png)
+Below is an example output for LeNet5:
+<!-- ![](header.png) -->
+
+
+```
+LeNet5(
+  61.71 k, 100.000% Params, 429.248 KMac, 100.000% MACs, 1.201 ms, 100.00% time, 0.001 TFLOPS,
+  (feature_extractor): Sequential(
+    50.69 k, 82.151% Params, 418.328 KMac, 97.456% MACs, 984.669 us, 81.98% time, 0.001 TFLOPS,
+    (0): Conv2d(156, 0.253% Params, 122.304 KMac, 28.493% MACs, 273.466 us, 22.77% time, 0.001 TFLOPS, 1, 6, kernel_size=(5, 5), stride=(1, 1))
+    (1): Tanh(0, 0.000% Params, 0 Mac, 0.000% MACs, 33.379 us, 2.78% time, 0.0 TFLOPS, )
+    (2): AvgPool2d(0, 0.000% Params, 4.704 KMac, 1.096% MACs, 41.723 us, 3.47% time, 0.0 TFLOPS, kernel_size=2, stride=2, padding=0)
+    (3): Conv2d(2.42 k, 3.915% Params, 241.6 KMac, 56.284% MACs, 218.63 us, 18.20% time, 0.002 TFLOPS, 6, 16, kernel_size=(5, 5), stride=(1, 1))
+    (4): Tanh(0, 0.000% Params, 0 Mac, 0.000% MACs, 26.464 us, 2.20% time, 0.0 TFLOPS, )
+    (5): AvgPool2d(0, 0.000% Params, 1.6 KMac, 0.373% MACs, 39.816 us, 3.31% time, 0.0 TFLOPS, kernel_size=2, stride=2, padding=0)
+    (6): Conv2d(48.12 k, 77.983% Params, 48.12 KMac, 11.210% MACs, 241.041 us, 20.07% time, 0.0 TFLOPS, 16, 120, kernel_size=(5, 5), stride=(1, 1))
+    (7): Tanh(0, 0.000% Params, 0 Mac, 0.000% MACs, 23.365 us, 1.95% time, 0.0 TFLOPS, )
+  )
+  (classifier): Sequential(
+    11.01 k, 17.849% Params, 10.92 KMac, 2.544% MACs, 154.018 us, 12.82% time, 0.0 TFLOPS,
+    (0): Linear(10.16 k, 16.472% Params, 10.08 KMac, 2.348% MACs, 59.128 us, 4.92% time, 0.0 TFLOPS, in_features=120, out_features=84, bias=True)
+    (1): Tanh(0, 0.000% Params, 0 Mac, 0.000% MACs, 18.597 us, 1.55% time, 0.0 TFLOPS, )
+    (2): Linear(850, 1.377% Params, 840 Mac, 0.196% MACs, 41.485 us, 3.45% time, 0.0 TFLOPS, in_features=84, out_features=10, bias=True)
+  )
+)
+Top 3 modules in flops at depth 2 are {'Conv2d': '412.02 KMac', 'Linear': '10.92 KMac', 'AvgPool2d': '6.3 KMac'}
+Top 3 modules in params at depth 2 are {'Conv2d': '50.69 k', 'Linear': '11.01 k', 'Tanh': '0'}
+Top 3 modules in time at depth 2 are {'Conv2d': '733.14 us', 'Tanh': '101.8 us', 'Linear': '100.61 us'}
+Number of multiply-adds:        429.25 KMac
+Number of parameters:           61.71 k
+```
 
 ## Installation
 
-OS X & Linux:
-
-```sh
-npm install my-crazy-module --save
+From PyPI:
+```bash
+pip install pytorch-profiler
 ```
 
-Windows:
-
-```sh
-edit autoexec.bat
+From this repository:
+```bash
+pip install --upgrade git+https://github.com/sovrasov/pytorch-profiler.git
 ```
 
-## Usage example
+## Usage
 
-A few motivating and useful examples of how your product can be used. Spice this up with code blocks and potentially more screenshots.
-
-_For more examples and usage, please refer to the [Wiki][wiki]._
-
-## Development setup
-
-Describe how to install all development dependencies and how to run an automated test-suite of some kind. Potentially do this for multiple platforms.
-
-```sh
-make install
-npm test
 ```
+import torchvision.models as models
+import torch
+from pytorch_profiler import get_model_profile
+
+with torch.cuda.device(0):
+    mod = models.alexnet()
+    macs, params = get_model_profile(mod,
+                                     (3, 224, 224),
+                                     print_profile=True,
+                                     print_aggregated_profile=True,
+                                     depth=-1,
+                                     top_num=3,
+                                     warm_up=10,
+                                     as_strings=True,
+                                     ignore_modules=None)
+    print('{:<30}  {:<8}'.format('Number of multiply-adds: ', macs))
+    print('{:<30}  {:<8}'.format('Number of parameters: ', params))
+```
+
+<!-- For more examples and usage, please refer to the [Wiki][wiki]._ -->
+
 
 ## Release History
-
-* 0.2.1
-    * CHANGE: Update docs (module code remains unchanged)
-* 0.2.0
-    * CHANGE: Remove `setDefaultXYZ()`
-    * ADD: Add `init()`
+<!--
 * 0.1.1
-    * FIX: Crash when calling `baz()` (Thanks @GenerousContributorName!)
+    * CHANGE: Update docs (module code remains unchanged) -->
 * 0.1.0
     * The first proper release
-    * CHANGE: Rename `foo()` to `bar()`
-* 0.0.1
-    * Work in progress
 
-## Meta
+## License
 
-Your Name – [@YourTwitter](https://twitter.com/dbader_org) – YourEmail@example.com
-
-Distributed under the XYZ license. See ``LICENSE`` for more information.
-
-[https://github.com/yourname/github-link](https://github.com/dbader/)
+Distributed under the MIT license. See ``LICENSE`` for more information.
 
 ## Contributing
 
-1. Fork it (<https://github.com/yourname/yourproject/fork>)
+1. Fork it (<https://github.com/cli99/pytorch-profiler>)
 2. Create your feature branch (`git checkout -b feature/fooBar`)
 3. Commit your changes (`git commit -am 'Add some fooBar'`)
 4. Push to the branch (`git push origin feature/fooBar`)

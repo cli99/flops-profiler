@@ -2,7 +2,6 @@ import time
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.nn.modules.module import register_module_forward_hook
 from functools import partial
 
 module_flop_count = []
@@ -24,13 +23,15 @@ def relu_flops_compute(input, inplace=False):
     return torch.numel(input)
 
 
-def pool_flops_compute(input,
-                       kernel_size,
-                       stride=None,
-                       padding=0,
-                       ceil_mode=False,
-                       count_include_pad=True,
-                       divisor_override=None):
+def pool_flops_compute(
+    input,
+    kernel_size,
+    stride=None,
+    padding=0,
+    ceil_mode=False,
+    count_include_pad=True,
+    divisor_override=None,
+):
     return torch.numel(input)
 
 
@@ -76,14 +77,16 @@ def conv_flops_compute(input,
     return int(overall_flops)
 
 
-def conv_trans_flops_compute(input,
-                             weight,
-                             bias=None,
-                             stride=1,
-                             padding=0,
-                             output_padding=0,
-                             groups=1,
-                             dilation=1):
+def conv_trans_flops_compute(
+    input,
+    weight,
+    bias=None,
+    stride=1,
+    padding=0,
+    output_padding=0,
+    groups=1,
+    dilation=1,
+):
     batch_size = input.shape[0]
     in_channels = input.shape[1]
     out_channels = weight.shape[0]
@@ -117,14 +120,16 @@ def conv_trans_flops_compute(input,
     return int(overall_flops)
 
 
-def batch_norm_flops_compute(input,
-                             running_mean,
-                             running_var,
-                             weight=None,
-                             bias=None,
-                             training=False,
-                             momentum=0.1,
-                             eps=1e-05):
+def batch_norm_flops_compute(
+    input,
+    running_mean,
+    running_var,
+    weight=None,
+    bias=None,
+    training=False,
+    momentum=0.1,
+    eps=1e-05,
+):
     # assume affine is true
     flops = 2 * torch.numel(input)
     return flops
@@ -133,7 +138,7 @@ def batch_norm_flops_compute(input,
 def upsample_flops_compute(input,
                            size=None,
                            scale_factor=None,
-                           mode='nearest',
+                           mode="nearest",
                            align_corners=None):
     if size is not None:
         return int(prod(size))
@@ -150,13 +155,15 @@ def softmax_flops_compute(input, dim=None, _stacklevel=3, dtype=None):
     return torch.numel(input)
 
 
-def embedding_flops_compute(input,
-                            weight,
-                            padding_idx=None,
-                            max_norm=None,
-                            norm_type=2.0,
-                            scale_grad_by_freq=False,
-                            sparse=False):
+def embedding_flops_compute(
+    input,
+    weight,
+    padding_idx=None,
+    max_norm=None,
+    norm_type=2.0,
+    scale_grad_by_freq=False,
+    sparse=False,
+):
     return 0
 
 
@@ -224,6 +231,31 @@ F.softmax = wrapFunc(F.softmax, softmax_flops_compute)
 F.embedding = wrapFunc(F.embedding, embedding_flops_compute)
 
 
+def rnn_flops(flops, rnn_module, w_ih, w_hh, input_size):
+    # matrix matrix mult ih state and internal state
+    flops += w_ih.shape[0] * w_ih.shape[1]
+    # matrix matrix mult hh state and internal state
+    flops += w_hh.shape[0] * w_hh.shape[1]
+    if isinstance(rnn_module, (nn.RNN, nn.RNNCell)):
+        # add both operations
+        flops += rnn_module.hidden_size
+    elif isinstance(rnn_module, (nn.GRU, nn.GRUCell)):
+        # hadamard of r
+        flops += rnn_module.hidden_size
+        # adding operations from both states
+        flops += rnn_module.hidden_size * 3
+        # last two hadamard product and add
+        flops += rnn_module.hidden_size * 3
+    elif isinstance(rnn_module, (nn.LSTM, nn.LSTMCell)):
+        # adding operations from both states
+        flops += rnn_module.hidden_size * 4
+        # two hadamard product and add for C state
+        flops += rnn_module.hidden_size + rnn_module.hidden_size + rnn_module.hidden_size
+        # final hadamard
+        flops += rnn_module.hidden_size + rnn_module.hidden_size + rnn_module.hidden_size
+    return flops
+
+
 def rnn_forward_hook(rnn_module, input, output):
     """
     Takes into account batch goes at first position, contrary
@@ -238,16 +270,16 @@ def rnn_forward_hook(rnn_module, input, output):
     num_layers = rnn_module.num_layers
 
     for i in range(num_layers):
-        w_ih = rnn_module.__getattr__('weight_ih_l' + str(i))
-        w_hh = rnn_module.__getattr__('weight_hh_l' + str(i))
+        w_ih = rnn_module.__getattr__("weight_ih_l" + str(i))
+        w_hh = rnn_module.__getattr__("weight_hh_l" + str(i))
         if i == 0:
             input_size = rnn_module.input_size
         else:
             input_size = rnn_module.hidden_size
         flops = rnn_flops(flops, rnn_module, w_ih, w_hh, input_size)
         if rnn_module.bias:
-            b_ih = rnn_module.__getattr__('bias_ih_l' + str(i))
-            b_hh = rnn_module.__getattr__('bias_hh_l' + str(i))
+            b_ih = rnn_module.__getattr__("bias_ih_l" + str(i))
+            b_hh = rnn_module.__getattr__("bias_hh_l" + str(i))
             flops += b_ih.shape[0] + b_hh.shape[0]
 
     flops *= batch_size
@@ -261,13 +293,13 @@ def rnn_cell_forward_hook(rnn_cell_module, input, output):
     flops = 0
     inp = input[0]
     batch_size = inp.shape[0]
-    w_ih = rnn_cell_module.__getattr__('weight_ih')
-    w_hh = rnn_cell_module.__getattr__('weight_hh')
+    w_ih = rnn_cell_module.__getattr__("weight_ih")
+    w_hh = rnn_cell_module.__getattr__("weight_hh")
     input_size = inp.shape[1]
     flops = rnn_flops(flops, rnn_cell_module, w_ih, w_hh, input_size)
     if rnn_cell_module.bias:
-        b_ih = rnn_cell_module.__getattr__('bias_ih')
-        b_hh = rnn_cell_module.__getattr__('bias_hh')
+        b_ih = rnn_cell_module.__getattr__("bias_ih")
+        b_hh = rnn_cell_module.__getattr__("bias_hh")
         flops += b_ih.shape[0] + b_hh.shape[0]
 
     flops *= batch_size
@@ -281,7 +313,7 @@ MODULE_HOOK_MAPPING = {
     nn.LSTM: rnn_forward_hook,
     nn.RNNCell: rnn_cell_forward_hook,
     nn.LSTMCell: rnn_cell_forward_hook,
-    nn.GRUCell: rnn_cell_forward_hook
+    nn.GRUCell: rnn_cell_forward_hook,
 }
 
 
@@ -306,7 +338,7 @@ def add_profile_methods(model):
 
 def start_profile(self, **kwargs):
     def register_module_hooks(module, ignore_list):
-        if type(module) in ignore_list:
+        if ignore_list and type(module) in ignore_list:
             return
 
         # if compute the flops of a module directly
@@ -364,29 +396,29 @@ def reset_profile(self):
 
 
 def remove_profile_attrs(module):
-    if hasattr(module, '__batch__'):
+    if hasattr(module, "__batch__"):
         del module.__batch__
-    if hasattr(module, '__flops__'):
+    if hasattr(module, "__flops__"):
         del module.__flops__
-    if hasattr(module, '__params__'):
+    if hasattr(module, "__params__"):
         del module.__params__
-    if hasattr(module, '__start_time__'):
+    if hasattr(module, "__start_time__"):
         del module.__start_time__
-    if hasattr(module, '__end_time__'):
+    if hasattr(module, "__end_time__"):
         del module.__end_time__
-    if hasattr(module, '__pre_hook_handle__'):
+    if hasattr(module, "__pre_hook_handle__"):
         module.__pre_hook_handle__.remove()
         del module.__pre_hook_handle__
-    if hasattr(module, '__post_hook_handle__'):
+    if hasattr(module, "__post_hook_handle__"):
         module.__post_hook_handle__.remove()
         del module.__post_hook_handle__
-    if hasattr(module, '__flops_handle__'):
+    if hasattr(module, "__flops_handle__"):
         module.__flops_handle__.remove()
         del module.__flops_handle__
-    if hasattr(module, '__start_time_hook_handle__'):
+    if hasattr(module, "__start_time_hook_handle__"):
         module.__start_time_hook_handle__.remove()
         del module.__start_time_hook_handle__
-    if hasattr(module, '__end_time_hook_handle__'):
+    if hasattr(module, "__end_time_hook_handle__"):
         module.__end_time_hook_handle__.remove()
         del module.__end_time_hook_handle__
 
@@ -399,10 +431,7 @@ def compute_total_flops(self):
 
 
 def compute_total_duration(self):
-    sum = 0
-    for module in self.children():
-        sum += module.__end_time__ - module.__start_time__
-    return sum
+    return self.__end_time__ - self.__start_time__
 
 
 def stop_profile(self):
@@ -412,37 +441,37 @@ def stop_profile(self):
 def flops_to_string(flops, units=None, precision=2):
     if units is None:
         if flops // 10**9 > 0:
-            return str(round(flops / 10.**9, precision)) + ' GMac'
+            return str(round(flops / 10.0**9, precision)) + " GMac"
         elif flops // 10**6 > 0:
-            return str(round(flops / 10.**6, precision)) + ' MMac'
+            return str(round(flops / 10.0**6, precision)) + " MMac"
         elif flops // 10**3 > 0:
-            return str(round(flops / 10.**3, precision)) + ' KMac'
+            return str(round(flops / 10.0**3, precision)) + " KMac"
         else:
-            return str(flops) + ' Mac'
+            return str(flops) + " Mac"
     else:
-        if units == 'GMac':
-            return str(round(flops / 10.**9, precision)) + ' ' + units
-        elif units == 'MMac':
-            return str(round(flops / 10.**6, precision)) + ' ' + units
-        elif units == 'KMac':
-            return str(round(flops / 10.**3, precision)) + ' ' + units
+        if units == "GMac":
+            return str(round(flops / 10.0**9, precision)) + " " + units
+        elif units == "MMac":
+            return str(round(flops / 10.0**6, precision)) + " " + units
+        elif units == "KMac":
+            return str(round(flops / 10.0**3, precision)) + " " + units
         else:
-            return str(flops) + ' Mac'
+            return str(flops) + " Mac"
 
 
 def params_to_string(params_num, units=None, precision=2):
     if units is None:
         if params_num // 10**6 > 0:
-            return str(round(params_num / 10**6, 2)) + ' M'
+            return str(round(params_num / 10**6, 2)) + " M"
         elif params_num // 10**3:
-            return str(round(params_num / 10**3, 2)) + ' k'
+            return str(round(params_num / 10**3, 2)) + " k"
         else:
             return str(params_num)
     else:
-        if units == 'M':
-            return str(round(params_num / 10.**6, precision)) + ' ' + units
-        elif units == 'K':
-            return str(round(params_num / 10.**3, precision)) + ' ' + units
+        if units == "M":
+            return str(round(params_num / 10.0**6, precision)) + " " + units
+        elif units == "K":
+            return str(round(params_num / 10.0**3, precision)) + " " + units
         else:
             return str(params_num)
 
@@ -450,20 +479,20 @@ def params_to_string(params_num, units=None, precision=2):
 def duration_to_string(duration, units=None, precision=2):
     if units is None:
         if duration > 1:
-            return str(round(duration, precision)) + ' s'
+            return str(round(duration, precision)) + " s"
         elif duration * 10**3 > 1:
-            return str(round(duration * 10**3, precision)) + ' ms'
+            return str(round(duration * 10**3, precision)) + " ms"
         elif duration * 10**6 > 1:
-            return str(round(duration * 10**6, precision)) + ' us'
+            return str(round(duration * 10**6, precision)) + " us"
         else:
             return str(duration)
     else:
-        if units == 'us':
-            return str(round(duration * 10.**6, precision)) + ' ' + units
-        elif units == 'ms':
-            return str(round(duration * 10.**3, precision)) + ' ' + units
+        if units == "us":
+            return str(round(duration * 10.0**6, precision)) + " " + units
+        elif units == "ms":
+            return str(round(duration * 10.0**3, precision)) + " " + units
         else:
-            return str(round(duration, precision)) + ' s'
+            return str(round(duration, precision)) + " s"
 
 
 def print_model_profile(model,
@@ -487,21 +516,21 @@ def print_model_profile(model,
         flops = self.accumulate_flops()
         items = [
             params_to_string(params, units=units, precision=precision),
-            '{:.3%} Params'.format(params / total_params),
+            "{:.3%} Params".format(params / total_params),
             flops_to_string(flops, units=units, precision=precision),
-            '{:.3%} MACs'.format(0 if total_flops == 0 else flops /
-                                 total_flops)
+            "{:.3%} MACs".format(0 if total_flops == 0 else flops /
+                                 total_flops),
         ]
         duration = self.__end_time__ - self.__start_time__
         items.append(duration_to_string(duration, None, precision=precision))
         items.append(
-            '{:.2%} time'.format(0 if total_duration == 0 else duration /
+            "{:.2%} time".format(0 if total_duration == 0 else duration /
                                  total_duration))
-        items.append('0' if duration == 0 else
+        items.append("0" if duration == 0 else
                      str(round(2 * flops / duration / 10**12, precision)) +
-                     ' TFLOPS')
+                     " TFLOPS")
         items.append(self.original_extra_repr())
-        return ', '.join(items)
+        return ", ".join(items)
 
     def add_extra_repr(m):
         m.accumulate_flops = accumulate_flops.__get__(m)
@@ -512,10 +541,10 @@ def print_model_profile(model,
             assert m.extra_repr != m.original_extra_repr
 
     def del_extra_repr(m):
-        if hasattr(m, 'original_extra_repr'):
+        if hasattr(m, "original_extra_repr"):
             m.extra_repr = m.original_extra_repr
             del m.original_extra_repr
-        if hasattr(m, 'accumulate_flops'):
+        if hasattr(m, "accumulate_flops"):
             del m.accumulate_flops
 
     model.apply(add_extra_repr)
@@ -525,7 +554,7 @@ def print_model_profile(model,
 
 def print_model_aggregated_profile(model, depth=-1, top_num=3):
     info = {}
-    if not hasattr(model, '__flops__'):
+    if not hasattr(model, "__flops__"):
         print(
             "no __flops__ attribute in the model, call this function after start_profile and before stop_profile"
         )
@@ -536,12 +565,14 @@ def print_model_aggregated_profile(model, depth=-1, top_num=3):
             info[curr_depth] = {}
         if module.__class__.__name__ not in info[curr_depth]:
             info[curr_depth][module.__class__.__name__] = [
-                0, 0, 0
+                0,
+                0,
+                0,
             ]  # flops, params, time
         info[curr_depth][module.__class__.__name__][0] += module.__flops__
         info[curr_depth][module.__class__.__name__][1] += module.__params__
-        info[curr_depth][module.__class__.__name__][
-            2] += module.__end_time__ - module.__start_time__
+        info[curr_depth][module.__class__.__name__][2] += (
+            module.__end_time__ - module.__start_time__)
         has_children = len(module._modules.items()) != 0
         if has_children:
             for child in module.children():
@@ -581,14 +612,18 @@ def print_model_aggregated_profile(model, depth=-1, top_num=3):
     print(f"Top {num_items} modules in time at depth {depth} are {sort_time}")
 
 
-def get_model_profile(model,
-                      input_res,
-                      print_profile=True,
-                      print_aggregated_profile=True,
-                      as_strings=True,
-                      input_constructor=None,
-                      ignore_modules=[],
-                      warm_up=10):
+def get_model_profile(
+    model,
+    input_res,
+    input_constructor=None,
+    print_profile=True,
+    print_aggregated_profile=True,
+    depth=-1,
+    top_num=3,
+    warm_up=10,
+    as_strings=True,
+    ignore_modules=[],
+):
     assert type(input_res) is tuple
     assert len(input_res) >= 1
     assert isinstance(model, nn.Module)
@@ -604,7 +639,8 @@ def get_model_profile(model,
                 batch = torch.ones(()).new_empty(
                     (1, *input_res),
                     dtype=next(model.parameters()).dtype,
-                    device=next(model.parameters()).device)
+                    device=next(model.parameters()).device,
+                )
             except StopIteration:
                 batch = torch.ones(()).new_empty((1, *input_res))
             _ = model(batch)
@@ -618,7 +654,8 @@ def get_model_profile(model,
             batch = torch.ones(()).new_empty(
                 (1, *input_res),
                 dtype=next(model.parameters()).dtype,
-                device=next(model.parameters()).device)
+                device=next(model.parameters()).device,
+            )
         except StopIteration:
             batch = torch.ones(()).new_empty((1, *input_res))
         _ = model(batch)
@@ -629,7 +666,7 @@ def get_model_profile(model,
     if print_profile:
         print_model_profile(model, flops, params_count, duration)
     if print_aggregated_profile:
-        print_model_aggregated_profile(model, depth=-1, top_num=3)
+        print_model_aggregated_profile(model, depth=depth, top_num=top_num)
     model.stop_profile()
     if as_strings:
         return flops_to_string(flops), params_to_string(params_count)
@@ -643,13 +680,17 @@ class LeNet5(nn.Module):
 
         self.feature_extractor = nn.Sequential(
             nn.Conv2d(in_channels=1, out_channels=6, kernel_size=5, stride=1),
-            nn.Tanh(), nn.AvgPool2d(kernel_size=2),
+            nn.Tanh(),
+            nn.AvgPool2d(kernel_size=2),
             nn.Conv2d(in_channels=6, out_channels=16, kernel_size=5, stride=1),
-            nn.Tanh(), nn.AvgPool2d(kernel_size=2),
+            nn.Tanh(),
+            nn.AvgPool2d(kernel_size=2),
             nn.Conv2d(in_channels=16,
                       out_channels=120,
                       kernel_size=5,
-                      stride=1), nn.Tanh())
+                      stride=1),
+            nn.Tanh(),
+        )
 
         self.classifier = nn.Sequential(
             nn.Linear(in_features=120, out_features=84),
@@ -668,11 +709,16 @@ class LeNet5(nn.Module):
 if __name__ == "__main__":
     mod = LeNet5(10)
     input = torch.randn(3, 1, 32, 32)
-    macs, params = get_model_profile(mod,
-                                     tuple(input.shape)[1:],
-                                     as_strings=True,
-                                     print_profile=True,
-                                     print_aggregated_profile=True,
-                                     ignore_modules=None)
-    print('{:<30}  {:<8}'.format('Number of multiply-adds: ', macs))
-    print('{:<30}  {:<8}'.format('Number of parameters: ', params))
+    macs, params = get_model_profile(
+        mod,
+        tuple(input.shape)[1:],
+        print_profile=True,
+        print_aggregated_profile=True,
+        depth=-1,
+        top_num=3,
+        warm_up=10,
+        as_strings=True,
+        ignore_modules=None,
+    )
+    print("{:<30}  {:<8}".format("Number of multiply-adds: ", macs))
+    print("{:<30}  {:<8}".format("Number of parameters: ", params))
