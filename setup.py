@@ -9,12 +9,12 @@ import os
 import sys
 from shutil import rmtree
 
-from setuptools import find_packages, setup, Command
+from setuptools import setup, Command
 
 # Package meta-data.
-NAME = 'pytorch-profiler'
+NAME = 'flops-profiler'
 DESCRIPTION = 'Measure PyTorch model flops, latency, parameters hiearchically at each submodule.'
-URL = 'https://github.com/cli99/pytorch-profiler'
+URL = 'https://github.com/cli99/flops-profiler'
 EMAIL = 'pistasable@gmail.com'
 AUTHOR = 'Cheng Li'
 REQUIRES_PYTHON = '>=3.6.0'

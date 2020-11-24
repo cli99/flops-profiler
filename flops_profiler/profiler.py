@@ -326,10 +326,15 @@ def add_profile_methods(model):
     # adding additional methods to the existing module object,
     # this is done this way so that each function has access to self object
     model.start_profile = start_profile.__get__(model)
-    model.stop_profile = stop_profile.__get__(model)
+    model.end_profile = end_profile.__get__(model)
     model.reset_profile = reset_profile.__get__(model)
-    model.compute_total_flops = compute_total_flops.__get__(model)
-    model.compute_total_duration = compute_total_duration.__get__(model)
+    model.get_total_flops = get_total_flops.__get__(model)
+    model.get_total_duration = get_total_duration.__get__(model)
+    model.get_total_params = get_total_params.__get__(model)
+    model.get_total_steps = get_total_steps.__get__(model)
+    model.print_model_profile = print_model_profile.__get__(model)
+    model.print_model_aggregated_profile = print_model_aggregated_profile.__get__(
+        model)
 
     model.reset_profile()
 
@@ -350,17 +355,14 @@ def start_profile(self, **kwargs):
         # if compute the flops of the functionals in a module
         def pre_hook(module, input):
             module_flop_count.clear()
-            batch_size = 1
             if len(input) > 0:
                 # Can have multiple inputs, getting the first one
                 input = input[0]
-                batch_size = len(input)
-            module.__batch__ += batch_size
 
         module.__pre_hook_handle__ = module.register_forward_pre_hook(pre_hook)
 
         def post_hook(module, input, output):
-            module.__flops__ = sum([elem[1] for elem in module_flop_count])
+            module.__flops__ += sum([elem[1] for elem in module_flop_count])
             module_flop_count.clear()
 
         has_children = len(module._modules.items()) != 0
@@ -375,37 +377,40 @@ def start_profile(self, **kwargs):
             start_time_hook)
 
         def end_time_hook(module, input, output):
-            module.__end_time__ = time.time()
+            module.__duration__ += time.time() - module.__start_time__
 
         module.__end_time_hook_handle__ = module.register_forward_hook(
             end_time_hook)
 
     self.apply(partial(register_module_hooks, **kwargs))
 
+    def steps_hook(module, input, output):
+        module.__steps__ += 1
+
+    self.__steps__hook_handle__ = self.register_forward_hook(steps_hook)
+
 
 def add_or_reset_attrs(module):
     module.__flops__ = 0
-    module.__batch__ = 0
     module.__params__ = get_model_parameters_number(module)
     module.__start_time__ = 0
-    module.__end_time__ = 0
+    module.__duration__ = 0
 
 
 def reset_profile(self):
+    self.__steps__ = 0
     self.apply(add_or_reset_attrs)
 
 
 def remove_profile_attrs(module):
-    if hasattr(module, "__batch__"):
-        del module.__batch__
     if hasattr(module, "__flops__"):
         del module.__flops__
     if hasattr(module, "__params__"):
         del module.__params__
     if hasattr(module, "__start_time__"):
         del module.__start_time__
-    if hasattr(module, "__end_time__"):
-        del module.__end_time__
+    if hasattr(module, "__duration__"):
+        del module.__duration__
     if hasattr(module, "__pre_hook_handle__"):
         module.__pre_hook_handle__.remove()
         del module.__pre_hook_handle__
@@ -423,18 +428,33 @@ def remove_profile_attrs(module):
         del module.__end_time_hook_handle__
 
 
-def compute_total_flops(self):
+def get_total_flops(self):
     sum = 0
     for module in self.modules():
         sum += module.__flops__
+    return sum / self.__steps__
     return sum
 
 
-def compute_total_duration(self):
-    return self.__end_time__ - self.__start_time__
+def get_total_duration(self):
+    return self.__duration__ / self.__steps__
+    return self.__duration__
 
 
-def stop_profile(self):
+def get_total_params(self):
+    return self.__params__
+
+
+def get_total_steps(self):
+    return self.__steps__
+
+
+def end_profile(self):
+    if hasattr(self, "__steps__"):
+        del self.__steps__
+    if hasattr(self, "__steps__hook_handle__"):
+        self.__steps__hook_handle__.remove()
+        del self.__steps__hook_handle__
     self.apply(remove_profile_attrs)
 
 
@@ -495,12 +515,12 @@ def duration_to_string(duration, units=None, precision=2):
             return str(round(duration, precision)) + " s"
 
 
-def print_model_profile(model,
-                        total_flops,
-                        total_params,
-                        total_duration,
-                        units=None,
-                        precision=3):
+def print_model_profile(self):
+    total_flops = self.get_total_flops()
+    total_duration = self.get_total_duration()
+    total_params = self.__params__
+    total_steps = self.__steps__
+
     def accumulate_flops(self):
         has_children = len(self._modules.items()) != 0
         if not has_children:
@@ -513,22 +533,23 @@ def print_model_profile(model,
 
     def flops_repr(self):
         params = self.__params__
-        flops = self.accumulate_flops()
+        flops = self.accumulate_flops() / total_steps
         items = [
-            params_to_string(params, units=units, precision=precision),
-            "{:.3%} Params".format(params / total_params),
-            flops_to_string(flops, units=units, precision=precision),
-            "{:.3%} MACs".format(0 if total_flops == 0 else flops /
+            params_to_string(params),
+            "{:.2%} Params".format(params / total_params),
+            flops_to_string(flops),
+            "{:.2%} MACs".format(0.0 if total_flops == 0 else flops /
                                  total_flops),
         ]
-        duration = self.__end_time__ - self.__start_time__
-        items.append(duration_to_string(duration, None, precision=precision))
+        duration = self.__duration__ / total_steps
+        items.append(duration_to_string(duration))
         items.append(
-            "{:.2%} time".format(0 if total_duration == 0 else duration /
+            "{:.2%} time".format(0.0 if total_duration == 0 else duration /
                                  total_duration))
-        items.append("0" if duration == 0 else
-                     str(round(2 * flops / duration / 10**12, precision)) +
-                     " TFLOPS")
+        # flops = 2 * MACs
+        items.append(("{:.2} TFLOPS".format(0.0 if duration == 0 else 2 *
+                                            flops / duration / 10**12)))
+        items.append(str(total_steps))
         items.append(self.original_extra_repr())
         return ", ".join(items)
 
@@ -547,16 +568,17 @@ def print_model_profile(model,
         if hasattr(m, "accumulate_flops"):
             del m.accumulate_flops
 
-    model.apply(add_extra_repr)
-    print(model)
-    model.apply(del_extra_repr)
+    self.apply(add_extra_repr)
+    print(self)
+    self.apply(del_extra_repr)
 
 
-def print_model_aggregated_profile(model, depth=-1, top_num=3):
+def print_model_aggregated_profile(self, depth=-1, top_num=3):
     info = {}
-    if not hasattr(model, "__flops__"):
+    total_steps = self.__steps__
+    if not hasattr(self, "__flops__"):
         print(
-            "no __flops__ attribute in the model, call this function after start_profile and before stop_profile"
+            "no __flops__ attribute in the model, call this function after start_profile and before end_profile"
         )
         return
 
@@ -571,14 +593,13 @@ def print_model_aggregated_profile(model, depth=-1, top_num=3):
             ]  # flops, params, time
         info[curr_depth][module.__class__.__name__][0] += module.__flops__
         info[curr_depth][module.__class__.__name__][1] += module.__params__
-        info[curr_depth][module.__class__.__name__][2] += (
-            module.__end_time__ - module.__start_time__)
+        info[curr_depth][module.__class__.__name__][2] += (module.__duration__)
         has_children = len(module._modules.items()) != 0
         if has_children:
             for child in module.children():
                 walk_module(child, curr_depth + 1, info)
 
-    walk_module(model, 0, info)
+    walk_module(self, 0, info)
 
     max_depth = len(info)
     if depth == -1:
@@ -587,7 +608,7 @@ def print_model_aggregated_profile(model, depth=-1, top_num=3):
     num_items = min(top_num, len(info[depth]))
 
     sort_flops = {
-        k: flops_to_string(v[0])
+        k: flops_to_string(v[0] / total_steps)
         for k, v in sorted(info[depth].items(),
                            key=lambda item: item[1][0],
                            reverse=True)[:num_items]
@@ -599,7 +620,7 @@ def print_model_aggregated_profile(model, depth=-1, top_num=3):
                            reverse=True)[:num_items]
     }
     sort_time = {
-        k: duration_to_string(v[2])
+        k: duration_to_string(v[2] / total_steps)
         for k, v in sorted(info[depth].items(),
                            key=lambda item: item[1][2],
                            reverse=True)[:num_items]
@@ -620,16 +641,16 @@ def get_model_profile(
     print_aggregated_profile=True,
     depth=-1,
     top_num=3,
-    warm_up=10,
+    warm_up=5,
+    num_steps=10,
     as_strings=True,
-    ignore_modules=[],
+    ignore_modules=None,
 ):
     assert type(input_res) is tuple
     assert len(input_res) >= 1
     assert isinstance(model, nn.Module)
     model = add_profile_methods(model)
     model.eval()
-    model.start_profile(ignore_list=ignore_modules)
     for _ in range(warm_up):
         if input_constructor:
             input = input_constructor(input_res)
@@ -637,41 +658,43 @@ def get_model_profile(
         else:
             try:
                 batch = torch.ones(()).new_empty(
-                    (1, *input_res),
+                    (*input_res),
                     dtype=next(model.parameters()).dtype,
                     device=next(model.parameters()).device,
                 )
             except StopIteration:
-                batch = torch.ones(()).new_empty((1, *input_res))
+                batch = torch.ones(()).new_empty((*input_res))
             _ = model(batch)
-    model.reset_profile()
 
-    if input_constructor:
-        input = input_constructor(input_res)
-        _ = model(**input)
-    else:
-        try:
-            batch = torch.ones(()).new_empty(
-                (1, *input_res),
-                dtype=next(model.parameters()).dtype,
-                device=next(model.parameters()).device,
-            )
-        except StopIteration:
-            batch = torch.ones(()).new_empty((1, *input_res))
-        _ = model(batch)
+    model.start_profile(ignore_list=ignore_modules)
 
-    flops = model.compute_total_flops()
-    duration = model.compute_total_duration()
-    params_count = model.__params__
+    for _ in range(num_steps):
+        if input_constructor:
+            input = input_constructor(input_res)
+            _ = model(**input)
+        else:
+            try:
+                batch = torch.ones(()).new_empty(
+                    (*input_res),
+                    dtype=next(model.parameters()).dtype,
+                    device=next(model.parameters()).device,
+                )
+            except StopIteration:
+                batch = torch.ones(()).new_empty((*input_res))
+            _ = model(batch)
+
+    flops = model.get_total_flops()
+    params = model.get_total_params()
+    steps = model.get_total_steps()
     if print_profile:
-        print_model_profile(model, flops, params_count, duration)
+        model.print_model_profile()
     if print_aggregated_profile:
-        print_model_aggregated_profile(model, depth=depth, top_num=top_num)
-    model.stop_profile()
+        model.print_model_aggregated_profile(depth=depth, top_num=top_num)
+    model.end_profile()
     if as_strings:
-        return flops_to_string(flops), params_to_string(params_count)
+        return flops_to_string(flops), params_to_string(params), steps
 
-    return flops, params_count
+    return flops, params, steps
 
 
 class LeNet5(nn.Module):
@@ -708,17 +731,21 @@ class LeNet5(nn.Module):
 
 if __name__ == "__main__":
     mod = LeNet5(10)
-    input = torch.randn(3, 1, 32, 32)
-    macs, params = get_model_profile(
+    batch_size = 1024
+    input = torch.randn(batch_size, 1, 32, 32)
+    macs, params, steps = get_model_profile(
         mod,
-        tuple(input.shape)[1:],
+        tuple(input.shape),
         print_profile=True,
         print_aggregated_profile=True,
         depth=-1,
         top_num=3,
-        warm_up=10,
+        warm_up=5,
+        num_steps=10,
         as_strings=True,
         ignore_modules=None,
     )
+    print("{:<30}  {:<8}".format("Batch size: ", batch_size))
     print("{:<30}  {:<8}".format("Number of multiply-adds: ", macs))
     print("{:<30}  {:<8}".format("Number of parameters: ", params))
+    print("{:<30}  {:<8}".format("Number of steps profiled: ", steps))
