@@ -1,7 +1,7 @@
 import argparse
 import torch
 import torchvision.models as models
-from flops_profiler import get_model_profile
+from flops_profiler.profiler import get_model_profile
 
 pt_models = {
     'resnet18': models.resnet18,
@@ -35,8 +35,8 @@ if __name__ == '__main__':
     macs, params, steps = get_model_profile(net, (batch_size, 3, 224, 224),
                                             print_profile=True,
                                             print_aggregated_profile=True,
-                                            depth=-1,
-                                            top_num=3,
+                                            module_depth=-1,
+                                            top_modules=3,
                                             warm_up=5,
                                             num_steps=10,
                                             as_strings=True,

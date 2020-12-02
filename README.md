@@ -45,8 +45,9 @@ Number of steps profiled:       10
 
 
 ```
-pip install --upgrade git+https://github.com/cli99/flops-profiler.git
+python -m pip install --upgrade git+https://github.com/cli99/flops-profiler.git
 ```
+
 
 ## Usage
 ### Use the high level-API and run the model inference for profiling purpose
@@ -59,16 +60,18 @@ from flops_profiler import get_model_profile
 with torch.cuda.device(0):
     mod = models.alexnet()
     batch_size = 256
-    macs, params, steps = get_model_profile(mod, # model
-                                     (batch_size, 3, 224, 224), # input shape or input to the input_constructor
-                                     input_constructor=None, # if specified, a constructor taking the the parameter before is used as input to the model
-                                     print_profile=True, # print model graph with the profile annotated
-                                     print_aggregated_profile=True, # print aggregated profile for top modules
-                                     depth=-1, # depth into the nested modules with -1 being the inner most modules
-                                     top_num=3, # the number of top modules to print aggregated profile
-                                     warm_up=10, # the number of warm-ups before measuring the time of each module
-                                     as_strings=True, # print raw numbers (e.g. 1000) or strings (e.g. 1k)
-                                     ignore_modules=None) # the list of modules to ignore in the profiling
+    macs, params, steps = get_model_profile(model, # the PyTorch model to be profiled
+                                     input_res=(batch_size, 3, 224, 224), # input shape or input to the input_constructor
+                                     input_constructor=None, # If specified, the constructor is applied to input_res and the constructor output is used as the input to the model
+                                     print_profile=True, # whether to print the model graph with the profile annotated. Defaults to True
+                                     print_aggregated_profile=True, # whether to print the aggregated profile for top modules. Defaults to True
+                                     module_depth=-1, # the depth into the nested modules. Defaults to -1 (the inner most modules)
+                                     top_modules=3, # the number of top modules to print aggregated profile
+                                     warm_up=10, # the number of warm-up steps before measuring the time of each module. Defaults to 5
+                                     num_steps=10, # the number of steps to profile. Defaults to 10
+                                     as_strings=True, # whether to print the output as strings (e.g. 1k). Defaults to True
+                                     ignore_modules=None) # the list of modules to ignore during profiling. Defaults to None
+
     print("{:<30}  {:<8}".format("Batch size: ", batch_size))
     print('{:<30}  {:<8}'.format('Number of multiply-adds: ', macs))
     print('{:<30}  {:<8}'.format('Number of parameters: ', params))
@@ -79,46 +82,48 @@ Examples of this usage is given in [examples](examples).
 
 ### Use the low-level APIs to profile the forward pass in the existing model training workflow
 
-```add_profile_methods```: adds the following methods to the model object:
-  * ```start_profile``` - starts profiling
-  * ```compute_total_flops``` - returns the total number of flops
-  * ```compute_total_duration``` - returns the total duration
-  * ```compute_total_params``` - returns the total number of params
-  * ```compute_total_steps``` - returns the total number of steps (or input batches) profiled.
-  * ```print_model_profile``` - prints the profile annotated
-  * ```print_model_aggregated_profile``` - prints the aggregated profile for the top modules
-  * ```end_profile``` - ends profiling and cleans up, invoked at the end of the profiling and before any printing method.
+- `start_profile` - starts profiling
+- `get_total_flops` - returns the total number of flops
+- `get_total_params` - returns the total number of params
+- `get_total_duration` - returns the total duration of the model forward pass
+- `get_total_steps` - returns the total number of steps (or input batches) profiled.
+- `print_model_profile` - prints the profile annotated
+- `print_model_aggregated_profile` - prints the aggregated profile for the top modules
+- `end_profile` - ends profiling and cleans up, invoked at the end of the profiling and before any printing method.
 
-```flops_to_string```,  ```params_to_string```, ```duration_to_string``` are utility functions to convert the metric number to string.
+`flops_to_string`, `params_to_string`, `duration_to_string` are utility functions to convert the metric number to string.
 
 Below is an example of this usage in a typical training workflow.
 
 ```python
-import flops_profiler as prof
+from flops_profiler.profiler import FlopsProfiler
 
 model = Model()
-model = prof.add_profile_methods(model)
+profiler = FlopsProfiler(model)
 
-profile_start_setp = 5
-profile_end_step = 10
-assert (profile_end_step > profile_start_step), "should end profiling after start profiling"
+start_step = 5
+end_step = 10
+assert (end_step > start_step), "should end profiling after start profiling"
 print_profile = True
 pring_aggregated_profile = True
 
 for step, batch in enumerate(data_loader):
   # start profiling at training step "profile_step"
-  if step == profile_start_step:
-    model.start_profile()
+  if step == start_step:
+    profiler.start_profile()
 
   # end profiling and print output at training step "profile_step"
-  if model == profile_end_step: # if using multi nodes, check global_rank == 0 as well
-    flops = model.get_total_flops()
-    params = model.get_total_params()
+  if model == end_step: # if using multi nodes, check global_rank == 0 as well
+    flops = profiler.get_total_flops()
+    params = profiler.get_total_flops()
+    duration = profiler.get_total_duration()
+    steps = profiler.get_total_steps()
     if print_profile:
-        model.print_model_profile()
+        profiler.print_model_profile()
     if print_aggregated_profile:
-        model.print_model_aggregated_profile(depth=-1, top_num=3)
-    model.end_profile()
+        profiler.print_model_aggregated_profile(module_depth=-1, top_modules=3)
+    profiler.end_profile()
+    print(flops, params, duration, step)
 
   # forward() method
   loss = model(batch)
@@ -128,5 +133,4 @@ for step, batch in enumerate(data_loader):
 
   # weight update
   optimizer.step()
-
 ```

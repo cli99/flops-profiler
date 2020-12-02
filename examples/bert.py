@@ -3,12 +3,13 @@ from functools import partial
 import torch
 from transformers import BertForSequenceClassification, BertTokenizer
 
-from deepspeed.profiling.flops_profiler import get_model_profile
+from flops_profiler.profiler import get_model_profile
 
 
 def bert_input_constructor(input_shape, tokenizer):
     inp_seq = ""
-    for _ in range(input_shape[1] - 2):  # there are two special tokens [CLS] and [SEP]
+    for _ in range(input_shape[1] -
+                   2):  # there are two special tokens [CLS] and [SEP]
         inp_seq += tokenizer.pad_token  # let's use pad token to form a fake
     # sequence for subsequent flops calculation
 
