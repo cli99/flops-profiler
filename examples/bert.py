@@ -2,7 +2,6 @@ from functools import partial
 
 import torch
 from transformers import BertForSequenceClassification, BertTokenizer
-
 from flops_profiler.profiler import get_model_profile
 
 
@@ -27,7 +26,7 @@ def bert_input_constructor(input_shape, tokenizer):
 if __name__ == '__main__':
     bert_tokenizer = BertTokenizer.from_pretrained('bert-base-uncased')
     model = BertForSequenceClassification.from_pretrained('bert-base-uncased')
-    macs, params, steps = get_model_profile(
+    macs, params = get_model_profile(
         model,
         (2, 128),
         input_constructor=partial(bert_input_constructor,
@@ -35,9 +34,8 @@ if __name__ == '__main__':
         print_profile=True,
         print_aggregated_profile=True,
     )
-    print("{:<30}  {:<8}".format("Number of multiply-adds: ", macs))
+    print("{:<30}  {:<8}".format("Number of MACs: ", macs))
     print("{:<30}  {:<8}".format("Number of parameters: ", params))
-    print("{:<30}  {:<8}".format("Number of steps profiled: ", steps))
 
 # Output:
 # Number of multiply-adds:        21.74 GMACs

@@ -32,17 +32,15 @@ if __name__ == '__main__':
         net.cuda(device=args.device)
 
     batch_size = 256
-    macs, params, steps = get_model_profile(net, (batch_size, 3, 224, 224),
-                                            print_profile=True,
-                                            print_aggregated_profile=True,
-                                            module_depth=-1,
-                                            top_modules=3,
-                                            warm_up=5,
-                                            num_steps=10,
-                                            as_strings=True,
-                                            ignore_modules=None)
+    macs, params = get_model_profile(net, (batch_size, 3, 224, 224),
+                                     print_profile=True,
+                                     print_aggregated_profile=True,
+                                     module_depth=-1,
+                                     top_modules=3,
+                                     warm_up=5,
+                                     as_string=True,
+                                     ignore_modules=None)
 
     print("{:<30}  {:<8}".format("Batch size: ", batch_size))
     print('{:<30}  {:<8}'.format('Number of MACs: ', macs))
     print('{:<30}  {:<8}'.format('Number of parameters: ', params))
-    print('{:<30}  {:<8}'.format('Number of steps profiled: ', steps))
