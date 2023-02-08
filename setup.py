@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 
 # Note: To use the 'upload' functionality of this file, you must:
 #   $ pipenv install twine --dev
@@ -107,7 +106,7 @@ setup(
     # packages=find_packages(
     #     exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
     # If your package is a single module, use this instead of 'packages':
-    py_modules=['pytorch_profiler'],
+    py_modules=['flops-profiler'],
     entry_points={
         "console_scripts": ["example=python_profiler.profile:main"],
     },
