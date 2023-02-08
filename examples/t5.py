@@ -25,8 +25,3 @@ flops, macs, params = get_model_profile(
 print("{:<30}  {:<8}".format("Number of flops: ", flops))
 print("{:<30}  {:<8}".format("Number of MACs: ", macs))
 print("{:<30}  {:<8}".format("Number of parameters: ", params))
-
-# Number of flops:                7.29 G
-# Number of MACs:                 3.64 GMACs
-# Number of parameters:           60.51 M
-# chengli in lambda-dual in flops-profiler/e

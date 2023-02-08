@@ -1,4 +1,4 @@
-This repo mirrors [DeepSpeed Flops Profiler](https://github.com/microsoft/DeepSpeed)
+This repo mirrors [DeepSpeed Flops Profiler](https://github.com/microsoft/DeepSpeed), can be installed by `pip install .`
 
 # DeepSpeed Flops Profiler
 
