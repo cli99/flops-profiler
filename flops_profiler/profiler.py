@@ -98,7 +98,6 @@ class FlopsProfiler(object):
                 module.__post_hook_handle__ = module.register_forward_hook(post_hook)
 
             def start_time_hook(module, input):
-                torch.cuda.synchronize()
                 module.__start_time__ = time.time()
 
             if not hasattr(module, "__start_time_hook_handle"):
@@ -106,7 +105,6 @@ class FlopsProfiler(object):
                     start_time_hook)
 
             def end_time_hook(module, input, output):
-                torch.cuda.synchronize()
                 module.__duration__ += time.time() - module.__start_time__
 
             if not hasattr(module, "__end_time_hook_handle__"):
@@ -284,21 +282,21 @@ class FlopsProfiler(object):
             print('{:<60}  {:<8}'.format('model parallel size: ',
                                          self.ds_engine.mp_world_size))
             print('{:<60}  {:<8}'.format(
-                'batch size per GPU: ',
+                'batch size per device: ',
                 self.ds_engine.train_micro_batch_size_per_gpu()))
 
-        print('{:<60}  {:<8}'.format('params per gpu: ', params_to_string(total_params)))
+        print('{:<60}  {:<8}'.format('params per device: ', params_to_string(total_params)))
         print('{:<60}  {:<8}'.format(
-            'params of model = params per GPU * mp_size: ',
+            'params of model = params per device * mp_size: ',
             params_to_string(total_params *
                              ((self.ds_engine.mp_world_size) if self.ds_engine else 1))))
 
-        print('{:<60}  {:<8}'.format('fwd MACs per GPU: ', macs_to_string(total_macs)))
+        print('{:<60}  {:<8}'.format('fwd MACs per device: ', macs_to_string(total_macs)))
 
-        print('{:<60}  {:<8}'.format('fwd flops per GPU: ', num_to_string(total_flops)))
+        print('{:<60}  {:<8}'.format('fwd flops per device: ', num_to_string(total_flops)))
 
         print('{:<60}  {:<8}'.format(
-            'fwd flops of model = fwd flops per GPU * mp_size: ',
+            'fwd flops of model = fwd flops per device * mp_size: ',
             num_to_string(total_flops *
                           ((self.ds_engine.mp_world_size) if self.ds_engine else 1))))
 
@@ -307,7 +305,7 @@ class FlopsProfiler(object):
             fwd_latency = self.ds_engine.timers('forward').elapsed(False) / 1000.0
         print('{:<60}  {:<8}'.format('fwd latency: ', duration_to_string(fwd_latency)))
         print('{:<60}  {:<8}'.format(
-            'fwd FLOPS per GPU = fwd flops per GPU / fwd latency: ',
+            'fwd FLOPS per device = fwd flops per device / fwd latency: ',
             flops_to_string(total_flops / fwd_latency)))
 
         if self.ds_engine and self.ds_engine.wall_clock_breakdown():
@@ -316,10 +314,10 @@ class FlopsProfiler(object):
             print('{:<60}  {:<8}'.format('bwd latency: ',
                                          duration_to_string(bwd_latency)))
             print('{:<60}  {:<8}'.format(
-                'bwd FLOPS per GPU = 2 * fwd flops per GPU / bwd latency: ',
+                'bwd FLOPS per device = 2 * fwd flops per device / bwd latency: ',
                 flops_to_string(2 * total_flops / bwd_latency)))
             print('{:<60}  {:<8}'.format(
-                'fwd+bwd FLOPS per GPU = 3 * fwd flops per GPU / (fwd+bwd latency): ',
+                'fwd+bwd FLOPS per device = 3 * fwd flops per device / (fwd+bwd latency): ',
                 flops_to_string(3 * total_flops / (fwd_latency + bwd_latency))))
 
             print('{:<60}  {:<8}'.format('step latency: ',
@@ -329,7 +327,7 @@ class FlopsProfiler(object):
             print('{:<60}  {:<8}'.format('iter latency: ',
                                          duration_to_string(iter_latency)))
             print('{:<60}  {:<8}'.format(
-                'FLOPS per GPU = 3 * fwd flops per GPU / iter latency: ',
+                'FLOPS per device = 3 * fwd flops per device / iter latency: ',
                 flops_to_string(3 * total_flops / iter_latency)))
 
             samples_per_iter = self.ds_engine.train_micro_batch_size_per_gpu(
@@ -372,14 +370,14 @@ class FlopsProfiler(object):
         self.model.apply(add_extra_repr)
 
         print(
-            "\n----------------------------- Aggregated Profile per GPU -----------------------------"
+            "\n----------------------------- Aggregated Profile per device -----------------------------"
         )
         self.print_model_aggregated_profile(module_depth=module_depth,
                                             top_modules=top_modules)
 
         if detailed:
             print(
-                "\n------------------------------ Detailed Profile per GPU ------------------------------"
+                "\n------------------------------ Detailed Profile per device ------------------------------"
             )
             print(
                 "Each module profile is listed after its name in the following order: \nparams, percentage of total params, MACs, percentage of total MACs, fwd latency, percentage of total fwd latency, fwd FLOPS"
@@ -1165,11 +1163,12 @@ def get_model_profile(
     print_profile=True,
     detailed=True,
     module_depth=-1,
-    top_modules=1,
-    warm_up=1,
+    top_modules=10,
+    warm_up=3,
     as_string=True,
     output_file=None,
     ignore_modules=None,
+    func_name="forward",
 ):
     """Returns the total floating-point operations, MACs, and parameters of a model.
 
@@ -1219,17 +1218,18 @@ def get_model_profile(
     assert (len(args) > 0) or (len(kwargs) > 0), "args and/or kwargs must be specified if input_shape is None"
 
     for _ in range(warm_up):
+        func = getattr(model, func_name)
         if kwargs:
-            _ = model(*args, **kwargs)
+            _ = func(*args, **kwargs)
         else:
-            _ = model(*args)
-
+            _ = func(*args)
     prof.start_profile(ignore_list=ignore_modules)
 
+    func = getattr(model, func_name)
     if kwargs:
-        _ = model(*args, **kwargs)
+        _ = func(*args, **kwargs)
     else:
-        _ = model(*args)
+        _ = func(*args)
 
     flops = prof.get_total_flops()
     macs = prof.get_total_macs()

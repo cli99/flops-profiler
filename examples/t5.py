@@ -2,26 +2,25 @@ import torch
 from transformers import T5ForConditionalGeneration, T5Tokenizer
 
 from flops_profiler.profiler import FlopsProfiler, get_model_profile
+import utils
 
 tokenizer = T5Tokenizer.from_pretrained("t5-small")
 model = T5ForConditionalGeneration.from_pretrained("t5-small")
 
-input_ids = tokenizer("translate English to German: The house is wonderful.",
-                      return_tensors="pt").input_ids
-
-model.eval()
+batch_size = 1
+seq_len = 128
+input_ids = torch.randint(
+    low=1000, high=10000, size=(batch_size, seq_len), dtype=torch.int64
+)
 
 flops, macs, params = get_model_profile(
     model,
     args=[input_ids],
     print_profile=True,
     detailed=True,
-    warm_up=0,
     module_depth=-1,
     top_modules=1,
-    mode='generate',
+    func_name="generate",
 )
 
-print("{:<30}  {:<8}".format("Number of flops: ", flops))
-print("{:<30}  {:<8}".format("Number of MACs: ", macs))
-print("{:<30}  {:<8}".format("Number of parameters: ", params))
+utils.print_output(flops, macs, params)

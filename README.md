@@ -1,5 +1,9 @@
 This repo mirrors [DeepSpeed Flops Profiler](https://github.com/microsoft/DeepSpeed), can be installed by `pip install .`
-
+# example
+ * [bert.py](examples/bert.py)
+ * [t5.py](examples/t5.py)
+ * [vision.py](examples/vision.py)
+ * [gpt2.py](examples/gpt2.py)
 # DeepSpeed Flops Profiler
 
 > Measures the parameters, latency, and floating-point operations of your model.
@@ -152,6 +156,7 @@ For models running on multi-GPU or multi-node, only change of the model parallel
 
 The DeepSpeed Flops Profiler can be used with the DeepSpeed runtime or as a standalone package. When using DeepSpeed for model training, the profiler can be configured in the deepspeed configuration file without user code change. To use the flops profiler outside of the DeepSpeed runtime, one can simply install DeepSpeed and import the flops_profiler package to use the APIs directly. Examples of each usage are given below.
 
+- [example](#example)
 - [DeepSpeed Flops Profiler](#deepspeed-flops-profiler)
   - [Overview](#overview)
   - [Flops Measurement](#flops-measurement)
