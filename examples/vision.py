@@ -16,20 +16,20 @@ pt_models = {
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         description='flops-profiler example script')
-    parser.add_argument('--device',
+    parser.add_argument('--cuda-device',
                         type=int,
                         default=0,
-                        help='Device to store the model.')
+                        help='Cuda device to run the model if available, else cpu is used.')
     parser.add_argument('--model',
                         choices=list(pt_models.keys()),
                         type=str,
-                        default='resnet18')
+                        default='resnet50')
     args = parser.parse_args()
 
     net = pt_models[args.model]()
 
     if torch.cuda.is_available():
-        net.cuda(device=args.device)
+        net.cuda(device=args.cuda_device)
 
     batch_size = 256
     flops, macs, params = get_model_profile(net, (batch_size, 3, 224, 224),
