@@ -50,7 +50,6 @@ class FlopsProfiler(object):
     Args:
         object (torch.nn.Module): The PyTorch model to profile.
     """
-
     def __init__(self, model, ds_engine=None):
         self.model = model
         self.ds_engine = ds_engine
@@ -86,21 +85,17 @@ class FlopsProfiler(object):
                 module_mac_count.append([])
 
             if not hasattr(module, "__pre_hook_handle__"):
-                module.__pre_hook_handle__ = module.register_forward_pre_hook(
-                    pre_hook)
+                module.__pre_hook_handle__ = module.register_forward_pre_hook(pre_hook)
 
             def post_hook(module, input, output):
                 if module_flop_count:
-                    module.__flops__ += sum(
-                        [elem[1] for elem in module_flop_count[-1]])
+                    module.__flops__ += sum([elem[1] for elem in module_flop_count[-1]])
                     module_flop_count.pop()
-                    module.__macs__ += sum(
-                        [elem[1] for elem in module_mac_count[-1]])
+                    module.__macs__ += sum([elem[1] for elem in module_mac_count[-1]])
                     module_mac_count.pop()
 
             if not hasattr(module, "__post_hook_handle__"):
-                module.__post_hook_handle__ = module.register_forward_hook(
-                    post_hook)
+                module.__post_hook_handle__ = module.register_forward_hook(post_hook)
 
             def start_time_hook(module, input):
                 torch.cuda.synchronize()
@@ -118,8 +113,7 @@ class FlopsProfiler(object):
                 module.__end_time_hook_handle__ = module.register_forward_hook(
                     end_time_hook)
 
-        self.model.apply(
-            partial(register_module_hooks, ignore_list=ignore_list))
+        self.model.apply(partial(register_module_hooks, ignore_list=ignore_list))
         self.started = True
         self.func_patched = True
 
@@ -157,7 +151,6 @@ class FlopsProfiler(object):
 
         Adds or resets the extra attributes.
         """
-
         def add_or_reset_attrs(module):
             module.__flops__ = 0
             module.__macs__ = 0
@@ -225,8 +218,7 @@ class FlopsProfiler(object):
             The latency of the model forward pass.
         """
         total_duration = get_module_duration(self.model)
-        return duration_to_string(
-            total_duration) if as_string else total_duration
+        return duration_to_string(total_duration) if as_string else total_duration
 
     def get_total_params(self, as_string=False):
         """Returns the total parameters of the model.
@@ -286,8 +278,7 @@ class FlopsProfiler(object):
             "Notations:\ndata parallel size (dp_size), model parallel size(mp_size),\nnumber of parameters (params), number of multiply-accumulate operations(MACs),\nnumber of floating-point operations (flops), floating-point operations per second (FLOPS),\nfwd latency (forward propagation latency), bwd latency (backward propagation latency),\nstep (weights update latency), iter latency (sum of fwd, bwd and step latency)\n"
         )
         if self.ds_engine:
-            print('{:<60}  {:<8}'.format('world size: ',
-                                         self.ds_engine.world_size))
+            print('{:<60}  {:<8}'.format('world size: ', self.ds_engine.world_size))
             print('{:<60}  {:<8}'.format('data parallel size: ',
                                          self.ds_engine.dp_world_size))
             print('{:<60}  {:<8}'.format('model parallel size: ',
@@ -296,41 +287,32 @@ class FlopsProfiler(object):
                 'batch size per GPU: ',
                 self.ds_engine.train_micro_batch_size_per_gpu()))
 
-        print('{:<60}  {:<8}'.format('params per gpu: ',
-                                     params_to_string(total_params)))
+        print('{:<60}  {:<8}'.format('params per gpu: ', params_to_string(total_params)))
         print('{:<60}  {:<8}'.format(
             'params of model = params per GPU * mp_size: ',
-            params_to_string(
-                total_params *
-                ((self.ds_engine.mp_world_size) if self.ds_engine else 1))))
+            params_to_string(total_params *
+                             ((self.ds_engine.mp_world_size) if self.ds_engine else 1))))
 
-        print('{:<60}  {:<8}'.format('fwd MACs per GPU: ',
-                                     macs_to_string(total_macs)))
+        print('{:<60}  {:<8}'.format('fwd MACs per GPU: ', macs_to_string(total_macs)))
 
-        print('{:<60}  {:<8}'.format('fwd flops per GPU: ',
-                                     num_to_string(total_flops)))
+        print('{:<60}  {:<8}'.format('fwd flops per GPU: ', num_to_string(total_flops)))
 
         print('{:<60}  {:<8}'.format(
             'fwd flops of model = fwd flops per GPU * mp_size: ',
-            num_to_string(
-                total_flops *
-                ((self.ds_engine.mp_world_size) if self.ds_engine else 1))))
+            num_to_string(total_flops *
+                          ((self.ds_engine.mp_world_size) if self.ds_engine else 1))))
 
         fwd_latency = self.get_total_duration()
         if self.ds_engine and self.ds_engine.wall_clock_breakdown():
-            fwd_latency = self.ds_engine.timers('forward').elapsed(
-                False) / 1000.0
-        print('{:<60}  {:<8}'.format('fwd latency: ',
-                                     duration_to_string(fwd_latency)))
+            fwd_latency = self.ds_engine.timers('forward').elapsed(False) / 1000.0
+        print('{:<60}  {:<8}'.format('fwd latency: ', duration_to_string(fwd_latency)))
         print('{:<60}  {:<8}'.format(
             'fwd FLOPS per GPU = fwd flops per GPU / fwd latency: ',
             flops_to_string(total_flops / fwd_latency)))
 
         if self.ds_engine and self.ds_engine.wall_clock_breakdown():
-            bwd_latency = self.ds_engine.timers('backward').elapsed(
-                False) / 1000.0
-            step_latency = self.ds_engine.timers('step').elapsed(
-                False) / 1000.0
+            bwd_latency = self.ds_engine.timers('backward').elapsed(False) / 1000.0
+            step_latency = self.ds_engine.timers('step').elapsed(False) / 1000.0
             print('{:<60}  {:<8}'.format('bwd latency: ',
                                          duration_to_string(bwd_latency)))
             print('{:<60}  {:<8}'.format(
@@ -338,8 +320,7 @@ class FlopsProfiler(object):
                 flops_to_string(2 * total_flops / bwd_latency)))
             print('{:<60}  {:<8}'.format(
                 'fwd+bwd FLOPS per GPU = 3 * fwd flops per GPU / (fwd+bwd latency): ',
-                flops_to_string(3 * total_flops /
-                                (fwd_latency + bwd_latency))))
+                flops_to_string(3 * total_flops / (fwd_latency + bwd_latency))))
 
             print('{:<60}  {:<8}'.format('step latency: ',
                                          duration_to_string(step_latency)))
@@ -362,19 +343,17 @@ class FlopsProfiler(object):
             macs = get_module_macs(module)
             items = [
                 params_to_string(params),
-                "{:.2%} Params".format(params /
-                                       total_params if total_params else 0),
+                "{:.2%} Params".format(params / total_params if total_params else 0),
                 macs_to_string(macs),
-                "{:.2%} MACs".format(0.0 if total_macs == 0 else macs /
-                                     total_macs),
+                "{:.2%} MACs".format(0.0 if total_macs == 0 else macs / total_macs),
             ]
             duration = get_module_duration(module)
 
             items.append(duration_to_string(duration))
-            items.append("{:.2%} latency".format(
-                0.0 if total_duration == 0 else duration / total_duration))
             items.append(
-                flops_to_string(0.0 if duration == 0 else flops / duration))
+                "{:.2%} latency".format(0.0 if total_duration == 0 else duration /
+                                        total_duration))
+            items.append(flops_to_string(0.0 if duration == 0 else flops / duration))
             items.append(module.original_extra_repr())
             return ", ".join(items)
 
@@ -443,11 +422,9 @@ class FlopsProfiler(object):
                     0,
                     0,
                 ]  # macs, params, time
-            info[curr_depth][module.__class__.__name__][0] += get_module_macs(
-                module)
+            info[curr_depth][module.__class__.__name__][0] += get_module_macs(module)
             info[curr_depth][module.__class__.__name__][1] += module.__params__
-            info[curr_depth][
-                module.__class__.__name__][2] += get_module_duration(module)
+            info[curr_depth][module.__class__.__name__][2] += get_module_duration(module)
             has_children = len(module._modules.items()) != 0
             if has_children:
                 for child in module.children():
@@ -468,21 +445,24 @@ class FlopsProfiler(object):
 
             sort_macs = {
                 k: macs_to_string(v[0])
-                for k, v in sorted(info[d].items(),
-                                   key=lambda item: item[1][0],
-                                   reverse=True)[:num_items]
+                for k,
+                v in sorted(info[d].items(),
+                            key=lambda item: item[1][0],
+                            reverse=True)[:num_items]
             }
             sort_params = {
                 k: params_to_string(v[1])
-                for k, v in sorted(info[d].items(),
-                                   key=lambda item: item[1][1],
-                                   reverse=True)[:num_items]
+                for k,
+                v in sorted(info[d].items(),
+                            key=lambda item: item[1][1],
+                            reverse=True)[:num_items]
             }
             sort_time = {
                 k: duration_to_string(v[2])
-                for k, v in sorted(info[d].items(),
-                                   key=lambda item: item[1][2],
-                                   reverse=True)[:num_items]
+                for k,
+                v in sorted(info[d].items(),
+                            key=lambda item: item[1][2],
+                            reverse=True)[:num_items]
             }
 
             print(f"depth {d}:")
@@ -512,9 +492,7 @@ def _prelu_flops_compute(input: Tensor, weight: Tensor):
     return input.numel(), 0
 
 
-def _elu_flops_compute(input: Tensor,
-                       alpha: float = 1.0,
-                       inplace: bool = False):
+def _elu_flops_compute(input: Tensor, alpha: float = 1.0, inplace: bool = False):
     return input.numel(), 0
 
 
@@ -532,7 +510,7 @@ def _silu_flops_compute(input: Tensor, inplace: bool = False):
     return input.numel(), 0
 
 
-def _gelu_flops_compute(input):
+def _gelu_flops_compute(input, **kwargs):
     return input.numel(), 0
 
 
@@ -572,13 +550,11 @@ def _conv_flops_compute(input,
     output_dims = []
     for idx, input_dim in enumerate(input_dims):
         output_dim = (input_dim + 2 * paddings[idx] -
-                      (dilations[idx] *
-                       (kernel_dims[idx] - 1) + 1)) // strides[idx] + 1
+                      (dilations[idx] * (kernel_dims[idx] - 1) + 1)) // strides[idx] + 1
         output_dims.append(output_dim)
 
     filters_per_channel = out_channels // groups
-    conv_per_position_macs = int(
-        _prod(kernel_dims)) * in_channels * filters_per_channel
+    conv_per_position_macs = int(_prod(kernel_dims)) * in_channels * filters_per_channel
     active_elements_count = batch_size * int(_prod(output_dims))
     overall_conv_macs = conv_per_position_macs * active_elements_count
     overall_conv_flops = 2 * overall_conv_macs
@@ -616,8 +592,7 @@ def _conv_trans_flops_compute(
     for idx, input_dim in enumerate(input_dims):
 
         output_dim = (input_dim + 2 * paddings[idx] -
-                      (dilations[idx] *
-                       (kernel_dims[idx] - 1) + 1)) // strides[idx] + 1
+                      (dilations[idx] * (kernel_dims[idx] - 1) + 1)) // strides[idx] + 1
         output_dims.append(output_dim)
 
     paddings = padding if type(padding) is tuple else (padding, padding)
@@ -625,8 +600,7 @@ def _conv_trans_flops_compute(
     dilations = dilation if type(dilation) is tuple else (dilation, dilation)
 
     filters_per_channel = out_channels // groups
-    conv_per_position_macs = int(
-        _prod(kernel_dims)) * in_channels * filters_per_channel
+    conv_per_position_macs = int(_prod(kernel_dims)) * in_channels * filters_per_channel
     active_elements_count = batch_size * int(_prod(input_dims))
     overall_conv_macs = conv_per_position_macs * active_elements_count
     overall_conv_flops = 2 * overall_conv_macs
@@ -693,16 +667,14 @@ def _instance_norm_flops_compute(
     return input.numel() * (5 if has_affine else 4), 0
 
 
-def _upsample_flops_compute(input,
-                            size=None,
-                            scale_factor=None,
-                            mode="nearest",
-                            align_corners=None):
+def _upsample_flops_compute(input, **kwargs):
+    size = kwargs.get('size', None)
     if size is not None:
-        if isinstance(size, tuple):
+        if isinstance(size, tuple) or isinstance(size, list):
             return int(_prod(size)), 0
         else:
             return int(size), 0
+    scale_factor = kwargs.get('scale_factor', None)
     assert scale_factor is not None, "either size or scale_factor should be defined"
     flops = input.numel()
     if isinstance(scale_factor, tuple) and len(scale_factor) == len(input):
@@ -770,13 +742,7 @@ def _einsum_flops_compute(equation, *operands):
     raise NotImplementedError("Unsupported einsum operation.")
 
 
-def _tensor_addmm_flops_compute(self,
-                                mat1,
-                                mat2,
-                                *,
-                                beta=1,
-                                alpha=1,
-                                out=None):
+def _tensor_addmm_flops_compute(self, mat1, mat2, *, beta=1, alpha=1, out=None):
     """
     Count flops for the tensor addmm operation.
     """
@@ -819,7 +785,7 @@ def _elementwise_flops_compute(input, other):
 
 def wrapFunc(func, funcFlopCompute):
     oldFunc = func
-    name = func.__name__
+    name = func.__str__
     old_functions[name] = oldFunc
 
     def newFunc(*args, **kwds):
@@ -830,7 +796,7 @@ def wrapFunc(func, funcFlopCompute):
             module_mac_count[-1].append((name, macs))
         return oldFunc(*args, **kwds)
 
-    newFunc.__name__ = func.__name__
+    newFunc.__str__ = func.__str__
 
     return newFunc
 
@@ -845,12 +811,9 @@ def _patch_functionals():
     F.conv3d = wrapFunc(F.conv3d, _conv_flops_compute)
 
     # conv transposed
-    F.conv_transpose1d = wrapFunc(F.conv_transpose1d,
-                                  _conv_trans_flops_compute)
-    F.conv_transpose2d = wrapFunc(F.conv_transpose2d,
-                                  _conv_trans_flops_compute)
-    F.conv_transpose3d = wrapFunc(F.conv_transpose3d,
-                                  _conv_trans_flops_compute)
+    F.conv_transpose1d = wrapFunc(F.conv_transpose1d, _conv_trans_flops_compute)
+    F.conv_transpose2d = wrapFunc(F.conv_transpose2d, _conv_trans_flops_compute)
+    F.conv_transpose3d = wrapFunc(F.conv_transpose3d, _conv_trans_flops_compute)
 
     # activations
     F.relu = wrapFunc(F.relu, _relu_flops_compute)
@@ -875,18 +838,12 @@ def _patch_functionals():
     F.max_pool1d = wrapFunc(F.max_pool1d, _pool_flops_compute)
     F.max_pool2d = wrapFunc(F.max_pool2d, _pool_flops_compute)
     F.max_pool3d = wrapFunc(F.max_pool3d, _pool_flops_compute)
-    F.adaptive_avg_pool1d = wrapFunc(F.adaptive_avg_pool1d,
-                                     _pool_flops_compute)
-    F.adaptive_avg_pool2d = wrapFunc(F.adaptive_avg_pool2d,
-                                     _pool_flops_compute)
-    F.adaptive_avg_pool3d = wrapFunc(F.adaptive_avg_pool3d,
-                                     _pool_flops_compute)
-    F.adaptive_max_pool1d = wrapFunc(F.adaptive_max_pool1d,
-                                     _pool_flops_compute)
-    F.adaptive_max_pool2d = wrapFunc(F.adaptive_max_pool2d,
-                                     _pool_flops_compute)
-    F.adaptive_max_pool3d = wrapFunc(F.adaptive_max_pool3d,
-                                     _pool_flops_compute)
+    F.adaptive_avg_pool1d = wrapFunc(F.adaptive_avg_pool1d, _pool_flops_compute)
+    F.adaptive_avg_pool2d = wrapFunc(F.adaptive_avg_pool2d, _pool_flops_compute)
+    F.adaptive_avg_pool3d = wrapFunc(F.adaptive_avg_pool3d, _pool_flops_compute)
+    F.adaptive_max_pool1d = wrapFunc(F.adaptive_max_pool1d, _pool_flops_compute)
+    F.adaptive_max_pool2d = wrapFunc(F.adaptive_max_pool2d, _pool_flops_compute)
+    F.adaptive_max_pool3d = wrapFunc(F.adaptive_max_pool3d, _pool_flops_compute)
 
     # upsample
     F.upsample = wrapFunc(F.upsample, _upsample_flops_compute)
@@ -905,11 +862,10 @@ def _patch_tensor_methods():
     torch.mm = wrapFunc(torch.mm, _matmul_flops_compute)
     torch.Tensor.mm = wrapFunc(torch.Tensor.mm, _matmul_flops_compute)
     torch.bmm = wrapFunc(torch.bmm, _matmul_flops_compute)
-    torch.Tensor.bmm = wrapFunc(torch.bmm, _matmul_flops_compute)
+    torch.Tensor.bmm = wrapFunc(torch.Tensor.bmm, _matmul_flops_compute)
 
     torch.addmm = wrapFunc(torch.addmm, _addmm_flops_compute)
-    torch.Tensor.addmm = wrapFunc(torch.Tensor.addmm,
-                                  _tensor_addmm_flops_compute)
+    torch.Tensor.addmm = wrapFunc(torch.Tensor.addmm, _tensor_addmm_flops_compute)
 
     torch.mul = wrapFunc(torch.mul, _mul_flops_compute)
     torch.Tensor.mul = wrapFunc(torch.Tensor.mul, _mul_flops_compute)
@@ -919,42 +875,65 @@ def _patch_tensor_methods():
 
     torch.einsum = wrapFunc(torch.einsum, _einsum_flops_compute)
 
+    torch.baddbmm = wrapFunc(torch.baddbmm, _tensor_addmm_flops_compute)
+
 
 def _reload_functionals():
     # torch.nn.functional does not support importlib.reload()
-    F.linear = old_functions[F.linear.__name__]
-    F.conv1d = old_functions[F.conv1d.__name__]
-    F.conv2d = old_functions[F.conv2d.__name__]
-    F.conv3d = old_functions[F.conv3d.__name__]
-    F.conv_transpose1d = old_functions[F.conv_transpose1d.__name__]
-    F.conv_transpose2d = old_functions[F.conv_transpose2d.__name__]
-    F.conv_transpose3d = old_functions[F.conv_transpose3d.__name__]
-    F.relu = old_functions[F.relu.__name__]
-    F.prelu = old_functions[F.prelu.__name__]
-    F.elu = old_functions[F.elu.__name__]
-    F.leaky_relu = old_functions[F.leaky_relu.__name__]
-    F.relu6 = old_functions[F.relu6.__name__]
-    F.batch_norm = old_functions[F.batch_norm.__name__]
-    F.avg_pool1d = old_functions[F.avg_pool1d.__name__]
-    F.avg_pool2d = old_functions[F.avg_pool2d.__name__]
-    F.avg_pool3d = old_functions[F.avg_pool3d.__name__]
-    F.max_pool1d = old_functions[F.max_pool1d.__name__]
-    F.max_pool2d = old_functions[F.max_pool2d.__name__]
-    F.max_pool3d = old_functions[F.max_pool3d.__name__]
-    F.adaptive_avg_pool1d = old_functions[F.adaptive_avg_pool1d.__name__]
-    F.adaptive_avg_pool2d = old_functions[F.adaptive_avg_pool2d.__name__]
-    F.adaptive_avg_pool3d = old_functions[F.adaptive_avg_pool3d.__name__]
-    F.adaptive_max_pool1d = old_functions[F.adaptive_max_pool1d.__name__]
-    F.adaptive_max_pool2d = old_functions[F.adaptive_max_pool2d.__name__]
-    F.adaptive_max_pool3d = old_functions[F.adaptive_max_pool3d.__name__]
-    F.upsample = old_functions[F.upsample.__name__]
-    F.interpolate = old_functions[F.interpolate.__name__]
-    F.softmax = old_functions[F.softmax.__name__]
-    F.embedding = old_functions[F.embedding.__name__]
+    F.linear = old_functions[F.linear.__str__]
+    F.conv1d = old_functions[F.conv1d.__str__]
+    F.conv2d = old_functions[F.conv2d.__str__]
+    F.conv3d = old_functions[F.conv3d.__str__]
+    F.conv_transpose1d = old_functions[F.conv_transpose1d.__str__]
+    F.conv_transpose2d = old_functions[F.conv_transpose2d.__str__]
+    F.conv_transpose3d = old_functions[F.conv_transpose3d.__str__]
+    F.relu = old_functions[F.relu.__str__]
+    F.prelu = old_functions[F.prelu.__str__]
+    F.elu = old_functions[F.elu.__str__]
+    F.leaky_relu = old_functions[F.leaky_relu.__str__]
+    F.relu6 = old_functions[F.relu6.__str__]
+    if hasattr(F, "silu"):
+        F.silu = old_functions[F.silu.__str__]
+    F.gelu = old_functions[F.gelu.__str__]
+    F.batch_norm = old_functions[F.batch_norm.__str__]
+    F.layer_norm = old_functions[F.layer_norm.__str__]
+    F.instance_norm = old_functions[F.instance_norm.__str__]
+    F.group_norm = old_functions[F.group_norm.__str__]
+    F.avg_pool1d = old_functions[F.avg_pool1d.__str__]
+    F.avg_pool2d = old_functions[F.avg_pool2d.__str__]
+    F.avg_pool3d = old_functions[F.avg_pool3d.__str__]
+    F.max_pool1d = old_functions[F.max_pool1d.__str__]
+    F.max_pool2d = old_functions[F.max_pool2d.__str__]
+    F.max_pool3d = old_functions[F.max_pool3d.__str__]
+    F.adaptive_avg_pool1d = old_functions[F.adaptive_avg_pool1d.__str__]
+    F.adaptive_avg_pool2d = old_functions[F.adaptive_avg_pool2d.__str__]
+    F.adaptive_avg_pool3d = old_functions[F.adaptive_avg_pool3d.__str__]
+    F.adaptive_max_pool1d = old_functions[F.adaptive_max_pool1d.__str__]
+    F.adaptive_max_pool2d = old_functions[F.adaptive_max_pool2d.__str__]
+    F.adaptive_max_pool3d = old_functions[F.adaptive_max_pool3d.__str__]
+    F.upsample = old_functions[F.upsample.__str__]
+    F.interpolate = old_functions[F.interpolate.__str__]
+    F.softmax = old_functions[F.softmax.__str__]
+    F.embedding = old_functions[F.embedding.__str__]
 
 
 def _reload_tensor_methods():
-    torch.matmul = old_functions[torch.matmul.__name__]
+    torch.matmul = old_functions[torch.matmul.__str__]
+    torch.Tensor.matmul = old_functions[torch.Tensor.matmul.__str__]
+    torch.mm = old_functions[torch.mm.__str__]
+    torch.Tensor.mm = old_functions[torch.Tensor.mm.__str__]
+    torch.bmm = old_functions[torch.matmul.__str__]
+    torch.Tensor.bmm = old_functions[torch.Tensor.bmm.__str__]
+    torch.addmm = old_functions[torch.addmm.__str__]
+    torch.Tensor.addmm = old_functions[torch.Tensor.addmm.__str__]
+    torch.mul = old_functions[torch.mul.__str__]
+    torch.Tensor.mul = old_functions[torch.Tensor.mul.__str__]
+    torch.add = old_functions[torch.add.__str__]
+    torch.Tensor.add = old_functions[torch.Tensor.add.__str__]
+
+    torch.einsum = old_functions[torch.einsum.__str__]
+
+    torch.baddbmm = old_functions[torch.baddbmm.__str__]
 
 
 def _rnn_flops(flops, rnn_module, w_ih, w_hh, input_size):
@@ -1191,7 +1170,6 @@ def get_model_profile(
     as_string=True,
     output_file=None,
     ignore_modules=None,
-    mode='forward',
 ):
     """Returns the total floating-point operations, MACs, and parameters of a model.
 
@@ -1226,11 +1204,11 @@ def get_model_profile(
 
     if input_shape is not None:
         assert type(input_shape) is tuple, "input_shape must be a tuple"
-        assert len(
-            input_shape) >= 1, "input_shape must have at least one element"
+        assert len(input_shape) >= 1, "input_shape must have at least one element"
         try:
             input = torch.ones(()).new_empty(
-                (*input_shape, ),
+                (*input_shape,
+                 ),
                 dtype=next(model.parameters()).dtype,
                 device=next(model.parameters()).device,
             )
@@ -1238,33 +1216,20 @@ def get_model_profile(
             input = torch.ones(()).new_empty((*input_shape, ))
 
         args = [input]
-    assert (len(args) > 0) or (
-        len(kwargs) >
-        0), "args and/or kwargs must be specified if input_shape is None"
+    assert (len(args) > 0) or (len(kwargs) > 0), "args and/or kwargs must be specified if input_shape is None"
 
     for _ in range(warm_up):
         if kwargs:
-            if mode == 'forward':
-                _ = model(*args, **kwargs)
-            if mode == 'generate':
-                _ = model.generate(*args, **kwargs)
+            _ = model(*args, **kwargs)
         else:
-            if mode == 'forward':
-                _ = model(*args)
-            if mode == 'generate':
-                _ = model.generate(*args)
+            _ = model(*args)
+
     prof.start_profile(ignore_list=ignore_modules)
 
     if kwargs:
-        if mode == 'forward':
-            _ = model(*args, **kwargs)
-        if mode == 'generate':
-            _ = model.generate(*args, **kwargs)
+        _ = model(*args, **kwargs)
     else:
-        if mode == 'forward':
-            _ = model(*args)
-        if mode == 'generate':
-            _ = model.generate(*args)
+        _ = model(*args)
 
     flops = prof.get_total_flops()
     macs = prof.get_total_macs()
@@ -1278,7 +1243,6 @@ def get_model_profile(
 
     prof.end_profile()
     if as_string:
-        return number_to_string(flops), macs_to_string(macs), params_to_string(
-            params)
+        return number_to_string(flops), macs_to_string(macs), params_to_string(params)
 
     return flops, macs, params
