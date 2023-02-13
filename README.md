@@ -1,5 +1,9 @@
 # Flops Profiler
 
+[![tests](https://github.com/cli99/flops-profiler/workflows/tests/badge.svg)](https://github.com/cli99/flops-profiler/actions?workflow=tests)
+[![PyPI](https://img.shields.io/pypi/v/flops-profiler.svg)](https://pypi.org/project/flops-profiler/)
+[![Read the Docs](https://readthedocs.org/projects/flops-profiler/badge/)](https://flops-profiler.readthedocs.io/)
+
 > Measures the parameters, latency, and floating-point operations of PyTorch model.
 
   - [Overview](#overview)

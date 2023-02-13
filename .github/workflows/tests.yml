@@ -1,0 +1,13 @@
+# .github/workflows/tests.yml
+name: tests
+on: push
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v1
+        with:
+          python-version: 3.8
+          architecture: x64
+      - run: pytest --verbose -k 'test' tests/
