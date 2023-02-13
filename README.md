@@ -2,8 +2,9 @@
 
 [![PyPI](https://img.shields.io/pypi/v/flops-profiler.svg)](https://pypi.org/project/flops-profiler/)
 [![Read the Docs](https://readthedocs.org/projects/flops-profiler/badge/)](https://flops-profiler.readthedocs.io/)
-[![tests](https://github.com/cli99/flops-profiler/workflows/tests/badge.svg)](https://github.com/cli99/flops-profiler/actions?workflow=tests)
-[![Codecov](https://codecov.io/gh/cli99/flops-profiler/branch/master/graph/badge.svg)](https://codecov.io/gh/cli99/flops-profiler)
+[![Tests](https://github.com/cli99/flops-profiler/workflows/tests/badge.svg)](https://github.com/cli99/flops-profiler/actions?workflow=tests)
+[![Codecov](https://codecov.io/gh/cli99/flops-profiler/branch/main/graph/badge.svg)](https://codecov.io/gh/cli99/flops-profiler)
+[![GitHub license](https://img.shields.io/github/license/cli99/flops-profiler)](https://github.com/cli99/flops-profiler/blob/main/LICENSE)
 
 > Measures the parameters, latency, and floating-point operations of PyTorch model.
 
