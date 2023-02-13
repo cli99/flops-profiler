@@ -7,7 +7,7 @@ import torch
 
 
 def create_test_tokens(
-    batch_size, seq_len, device="cpu", has_token_type_ids=False
+    batch_size, seq_len, device=torch.device("cpu"), has_token_type_ids=False
 ):
     tokens = {}
     mask_lens = torch.randint(low=1, high=seq_len, size=(batch_size,))
