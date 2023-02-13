@@ -173,21 +173,6 @@ For models running on multi-device or multi-node, only change of the model paral
 `model_parallel_size * flops = total_flops` and `model_parallel_size * parameters = total_parameters`. The data parallel size or world size (related to the number of GPUs or nodes) does not affect the per device profile.
 
 ## Usage
-
-- [Flops Profiler](#flops-profiler)
-  - [Install](#install)
-  - [Overview](#overview)
-  - [Examples](#examples)
-  - [Flops Measurement](#flops-measurement)
-  - [Multi-device, Multi-node, Data Parallelism, and Model Parallelism](#multi-device-multi-node-data-parallelism-and-model-parallelism)
-  - [Usage](#usage)
-    - [In Model Inference](#in-model-inference)
-      - [Example: AlexNet](#example-alexnet)
-    - [In Model Training Workflow](#in-model-training-workflow)
-      - [Example Training Workflow](#example-training-workflow)
-    - [Usage With the DeepSpeed Runtime](#usage-with-the-deepspeed-runtime)
-
-
 ### In Model Inference
 
 To profile a trained model in inference, we use the `get_model_profile` function. If the inference is involed in more than just a `forward` function of the model, for example, `model.generate()`, we can use the `start_profile`, `stop_profile`, and `end_profile` to capture the higher-level function (similar to the training use case); Or pass in `mode='generate'` when calling `get_model_profile`.
@@ -274,5 +259,5 @@ for step, batch in enumerate(data_loader):
 
 ### Usage With the DeepSpeed Runtime
 
-Refer to [DeepSpeed Flops Profiler](https://www.deepspeed.ai/docs/config-json/#flops-profiler) for details.
+Refer to [DeepSpeed Flops Profiler](https://www.deepspeed.ai/tutorials/flops-profiler/) for details.
 
