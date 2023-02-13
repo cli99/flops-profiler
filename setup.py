@@ -22,6 +22,7 @@ VERSION = '0.1.0'
 # What packages are required for this module to be executed?
 REQUIRED = [
     'torch',
+    'numpy',
 ]
 
 # What packages are optional?
@@ -106,7 +107,7 @@ setup(
     # packages=find_packages(
     #     exclude=["tests", "*.tests", "*.tests.*", "tests.*"]),
     # If your package is a single module, use this instead of 'packages':
-    py_modules=['flops-profiler'],
+    py_modules=['flops_profiler'],
     entry_points={
         "console_scripts": ["example=python_profiler.profile:main"],
     },
