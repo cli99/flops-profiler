@@ -6,12 +6,15 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10']
+
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v1
+      - uses: actions/checkout@v3
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.8'
-          architecture: x64
-      - run: pip install poetry==1.0.5
+          python-version: ${{ matrix.python-version }}
+      - run: pip install poetry
       - run: poetry build
       - run: poetry publish --username=__token__ --password=${{ secrets.PYPI_TOKEN }}
