@@ -1,6 +1,6 @@
 import os
 import sys
-sys.path.insert(0, os.path.abspath("../flops_profiler"))
+sys.path.insert(0, os.path.abspath(".."))
 
 # docs/conf.py
 """Sphinx configuration."""
