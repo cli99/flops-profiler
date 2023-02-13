@@ -1,22 +1,34 @@
 # Flops Profiler
 
-[![tests](https://github.com/cli99/flops-profiler/workflows/tests/badge.svg)](https://github.com/cli99/flops-profiler/actions?workflow=tests)
 [![PyPI](https://img.shields.io/pypi/v/flops-profiler.svg)](https://pypi.org/project/flops-profiler/)
 [![Read the Docs](https://readthedocs.org/projects/flops-profiler/badge/)](https://flops-profiler.readthedocs.io/)
+[![tests](https://github.com/cli99/flops-profiler/workflows/tests/badge.svg)](https://github.com/cli99/flops-profiler/actions?workflow=tests)
+[![Codecov](https://codecov.io/gh/cli99/flops-profiler/branch/master/graph/badge.svg)](https://codecov.io/gh/cli99/flops-profiler)
 
 > Measures the parameters, latency, and floating-point operations of PyTorch model.
 
+- [Flops Profiler](#flops-profiler)
+  - [Install](#install)
   - [Overview](#overview)
+  - [Examples](#examples)
   - [Flops Measurement](#flops-measurement)
-  - [Multi-GPU, Multi-node, Data Parallelism, and Model Parallelism](#multi-gpu-multi-node-data-parallelism-and-model-parallelism)
+  - [Multi-device, Multi-node, Data Parallelism, and Model Parallelism](#multi-device-multi-node-data-parallelism-and-model-parallelism)
   - [Usage](#usage)
+    - [In Model Inference](#in-model-inference)
+      - [Example: AlexNet](#example-alexnet)
+    - [In Model Training Workflow](#in-model-training-workflow)
+      - [Example Training Workflow](#example-training-workflow)
+    - [Usage With the DeepSpeed Runtime](#usage-with-the-deepspeed-runtime)
 
 Similar to  [DeepSpeed Flops Profiler](https://github.com/microsoft/DeepSpeed).
-## Examples
- * [bert.py](examples/bert.py)
- * [t5.py](examples/t5.py)
- * [vision.py](examples/vision.py)
- * [gpt2.py](examples/gpt2.py)
+
+## Install
+
+Install the flops profiler by
+
+```sh
+pip install flops_profiler
+```
 
 ## Overview
 
@@ -25,7 +37,7 @@ Effective use of hardware resources is critical to good performance, but perform
 Below is an example output for BERT-base on an A6000 GPU with batch size `1` and sequence length `128` (see [bert.py](examples/bert.py)):
 
 ```shell
--------------------------- DeepSpeed Flops Profiler --------------------------
+-------------------------- Flops Profiler --------------------------
 Profile Summary at step 3:
 Notations:
 data parallel size (dp_size), model parallel size(mp_size),
@@ -75,7 +87,7 @@ params, percentage of total params, MACs, percentage of total MACs, fwd latency,
 
 Note: 1. A module can have torch.nn.module or torch.nn.functional to compute logits (e.g. CrossEntropyLoss). They are not counted as submodules, thus not to be printed out. However they make up the difference between a parent's MACs (or latency) and the sum of its submodules'.
 2. Number of floating-point operations is a theoretical estimation, thus FLOPS computed using that could be larger than the maximum system throughput.
-3. The fwd latency listed in the top module's profile is directly captured at the module forward function in PyTorch, thus it's less than the fwd latency shown above which is captured in DeepSpeed.
+3. The fwd latency listed in the top module's profile is directly captured at the module forward function in PyTorch.
 
 BertModel(
   109.48 M, 100.00% Params, 11.17 GMACs, 100.00% MACs, 11.95 ms, 100.00% latency, 1.87 TFLOPS,
@@ -139,9 +151,13 @@ Number of parameters:           109.48 M
 
 In the summary profile, the Flops Profiler outputs the number of parameters, floating-point operations (flops), FLOPS, latency, and throughput in samples/second of the model. This profile shows how much performance gap (compared to the peak hardware performance) the current model execution has and helps users tune the training or inference setup (e.g., hyperparameters, data parallelism, model parallelism, system configurations, etc.) for better performance.
 
-The Flops Profiler also measures significant modules at different model depths (aggregated profile) and module-specific profile in the model architecture (detailed profile). Using these profiles DeepSpeed users can understand how each layer or submodule contributes to the overall model complexity/performance. Then users can adjust or refactor the model design to achieve better performance. For example, using the profiler, DeepSpeed users can quantitatively tell if stacking smaller layers is lighter or more performant than having bigger ones. The aggregated and detailed profiles also allow users to quickly identify bottleneck modules. In the BERT-Large example above, using the Flops Profiler, we find that BertLayer is the most significant layer and contains quite a few dropout, softmax, and layer norm along with linear modules. These modules are not heavy in flops and would trigger many device kernel invocations and create excessive read/write requests to memory. The pattern shown in the detailed profile suggests this is a perfect match for kernel fusion, and we developed fused transformer-kernels to reduce data movement (See DeepSpeedBert). After applying our optimizations, we see a 25% improvement in FLOPS per device and overall training samples/second in the Flops Profiler output.
+The Flops Profiler also measures significant modules at different model depths (aggregated profile) and module-specific profile in the model architecture (detailed profile). With these profiles users one can understand how each layer or submodule contributes to the overall model complexity/performance. Then users can adjust or refactor the model design to achieve better performance.
 
-The Flops Profiler can be used with the DeepSpeed runtime without any user code change or be used independently from DeepSpeed as a standalone package. When using DeepSpeed for model training, the profiler can be enabled in the DeepSpeed configuration file. As a standalone package, the profiler API can be used in both training and inference code. The DeepSpeed profiler is still under active development and includes just initial features.  Stay connected for more exciting features to be added soon.
+## Examples
+ * [bert.py](examples/bert.py)
+ * [t5.py](examples/t5.py)
+ * [vision.py](examples/vision.py)
+ * [gpt2.py](examples/gpt2.py)
 
 ## Flops Measurement
 
@@ -158,41 +174,34 @@ For models running on multi-device or multi-node, only change of the model paral
 
 ## Usage
 
-The Flops Profiler can be used with the DeepSpeed runtime or as a standalone package. When using DeepSpeed for model training, the profiler can be configured in the deepspeed configuration file without user code change. To use the Flops Profiler outside of the DeepSpeed runtime, one can simply install DeepSpeed and import the flops_profiler package to use the APIs directly. Examples of each usage are given below.
-
 - [Flops Profiler](#flops-profiler)
-  - [Examples](#examples)
+  - [Install](#install)
   - [Overview](#overview)
+  - [Examples](#examples)
   - [Flops Measurement](#flops-measurement)
   - [Multi-device, Multi-node, Data Parallelism, and Model Parallelism](#multi-device-multi-node-data-parallelism-and-model-parallelism)
   - [Usage](#usage)
-    - [Usage Outside the DeepSpeed Runtime](#usage-outside-the-deepspeed-runtime)
-      - [In Model Inference](#in-model-inference)
-        - [Example: AlexNet](#example-alexnet)
-      - [In Model Training Workflow](#in-model-training-workflow)
-        - [Example Training Workflow](#example-training-workflow)
+    - [In Model Inference](#in-model-inference)
+      - [Example: AlexNet](#example-alexnet)
+    - [In Model Training Workflow](#in-model-training-workflow)
+      - [Example Training Workflow](#example-training-workflow)
     - [Usage With the DeepSpeed Runtime](#usage-with-the-deepspeed-runtime)
-      - [Example: Megatron-LM](#example-megatron-lm)
-###  Usage Outside the DeepSpeed Runtime
 
-The profiler can be used as a standalone package outside of the DeepSpeed runtime.
-One can simply install DeepSpeed and import the `flops_profiler` package to use the APIs directly.
-Refer to [installation of DeepSpeed](https://www.deepspeed.ai/getting-started/#installation) for installing DeepSpeed.
 
-#### In Model Inference
+### In Model Inference
 
 To profile a trained model in inference, we use the `get_model_profile` function. If the inference is involed in more than just a `forward` function of the model, for example, `model.generate()`, we can use the `start_profile`, `stop_profile`, and `end_profile` to capture the higher-level function (similar to the training use case); Or pass in `mode='generate'` when calling `get_model_profile`.
 
 Examples are given below.
 
-##### Example: AlexNet
+#### Example: AlexNet
 
 The following example shows how to profile AlexNet using the Flops Profiler.
 
 ```python
 import torchvision.models as models
 import torch
-from deepspeed.profiling.flops_profiler import get_model_profile
+from flops_profiler import get_model_profile
 
 with torch.cuda.device(0):
     model = models.alexnet()
@@ -212,7 +221,7 @@ with torch.cuda.device(0):
                                     func_name='forward') # the function name to profile, "forward" by default, for huggingface generative models, `generate` is used
 ```
 
-#### In Model Training Workflow
+### In Model Training Workflow
 
 To profile model forward in a training workflow, use the `FlopsProfiler`class.
 The `FlopsProfiler`class provides the following methods:
@@ -224,12 +233,12 @@ The `FlopsProfiler`class provides the following methods:
   * `stop_profile()` - stops profiling. This stops the flops counting in the model.
   * `end_profile()` - cleans up. This cleans up the profile attributes added to the model during the profiling. This should be invoked at the end of the profiling and AFTER `get_total_flops`, `get_total_macs`, `get_total_params` or `print_model_profile`.
 
-##### Example Training Workflow
+#### Example Training Workflow
 
 Below is an example of this usage in a typical training workflow.
 
 ```python
-from deepspeed.profiling.flops_profiler import FlopsProfiler
+from flops_profiler import FlopsProfiler
 
 model = Model()
 prof = FlopsProfiler(model)
@@ -265,130 +274,5 @@ for step, batch in enumerate(data_loader):
 
 ### Usage With the DeepSpeed Runtime
 
-When using DeepSpeed for model training, the profiler can be configured in the deepspeed configuration file. No explicit API calls are needed to use the profiler. The profiler can be enabled by adding the following field to the `deepspeed_config` json file. Refer to [Flops Profiler](https://www.deepspeed.ai/docs/config-json/#flops-profiler) for details.
+Refer to [DeepSpeed Flops Profiler](https://www.deepspeed.ai/docs/config-json/#flops-profiler) for details.
 
-```json
-{
-  "flops_profiler": {
-    "enabled": true,
-    "profile_step": 1,
-    "module_depth": -1,
-    "top_modules": 1,
-    "detailed": true,
-    "output_file": null
-    }
-}
-```
-
-#### Example: Megatron-LM
-
-For information on running Megatron-LM with DeepSpeed, please refer to the tutorial [Megatron-LM](https://github.com/microsoft/DeepSpeedExamples/tree/master/Megatron-LM).
-
-An example output of 12-layer Megatron-LM model (`hidden_size = 8192, num_attention_heads = 32, batch_size = 1024, seq_length = 1024`) is shown below.
-
-```shell
--------------------------- Flops Profiler --------------------------
-Profile Summary at step 10:
-Notations:
-data parallel size (dp_size), model parallel size(mp_size),
-number of parameters (params), number of multiply-accumulate operations(MACs),
-number of floating-point operations (flops), floating-point operations per second (FLOPS),
-fwd latency (forward propagation latency), bwd latency (backward propagation latency),
-step (weights update latency), iter latency (sum of fwd, bwd and step latency)
-
-world size:                                                   1
-data parallel size:                                           1
-model parallel size:                                          1
-batch size per device:                                           1024
-params per gpu:                                               1.29 M
-params of model = params per device * mp_size:                   1.29 M
-fwd MACs per device:                                             41271.95 G
-fwd flops per device:                                            82543.9 G
-fwd flops of model = fwd flops per device * mp_size:             82543.9 G
-fwd latency:                                                  1.89 s
-bwd latency:                                                  5.38 s
-fwd FLOPS per device = fwd flops per device / fwd latency:          43.68 TFLOPS
-bwd FLOPS per device = 2 * fwd flops per device / bwd latency:      30.7 TFLOPS
-fwd+bwd FLOPS per device = 3 * fwd flops per device / (fwd+bwd latency):   34.07 TFLOPS
-step latency:                                                 34.12 s
-iter latency:                                                 41.39 s
-samples/second:                                               24.74
-
------------------------------ Aggregated Profile per device -----------------------------
-Top 1 modules in terms of params, MACs or fwd latency at different model depths:
-depth 0:
-    params      - {'GPT2Model': '1.29 M'}
-    MACs        - {'GPT2Model': '41271.95 GMACs'}
-    fwd latency - {'GPT2Model': '1.84 s'}
-depth 1:
-    params      - {'TransformerLanguageModel': '1.29 M'}
-    MACs        - {'TransformerLanguageModel': '39584.03 GMACs'}
-    fwd latency - {'TransformerLanguageModel': '1.83 s'}
-depth 2:
-    params      - {'ParallelTransformer': '1.29 M'}
-    MACs        - {'ParallelTransformer': '39584.03 GMACs'}
-    fwd latency - {'ParallelTransformer': '1.81 s'}
-depth 3:
-    params      - {'ModuleList': '1.28 M'}
-    MACs        - {'ModuleList': '39584.03 GMACs'}
-    fwd latency - {'ModuleList': '1.3 s'}
-depth 4:
-    params      - {'ParallelTransformerLayerPart2': '688.15 k'}
-    MACs        - {'ParallelTransformerLayerPart2': '26388.28 GMACs'}
-    fwd latency - {'ParallelTransformerLayerPart2': '865.73 ms'}
-depth 5:
-    params      - {'ParallelMLP': '491.54 k'}
-    MACs        - {'ParallelMLP': '26388.28 GMACs'}
-    fwd latency - {'ParallelMLP': '849.4 ms'}
-
------------------------------- Detailed Profile per device ------------------------------
-Each module profile is listed after its name in the following order:
-params, percentage of total params, MACs, percentage of total MACs, fwd latency, percentage of total fwd latency, fwd FLOPS
-
-Note: 1. A module can have torch.nn.module or torch.nn.functional to compute logits (e.g. CrossEntropyLoss). They are not counted as submodules, thus not to be printed out. However they make up the difference between a parent's MACs(or latency) and the sum of its submodules'.
-2. Number of floating-point operations is a theoretical estimation, thus FLOPS computed using that could be larger than the maximum system throughput.
-3. The fwd latency listed in the top module's profile is directly captured at the module forward function in PyTorch, thus it's less than the fwd latency shown above which is captured in DeepSpeed.
-
-GPT2Model(
-  1.29 M, 100.00% Params, 41271.95 GMACs, 100.00% MACs, 1.84 s, 100.00% latency, 44.78 TFLOPS,
-  (language_model): TransformerLanguageModel(
-    1.29 M, 100.00% Params, 39584.03 GMACs, 95.91% MACs, 1.83 s, 99.11% latency, 43.34 TFLOPS,
-    (embedding): Embedding(
-      2, 0.00% Params, 0 MACs, 0.00% MACs, 18.1 ms, 0.98% latency, 0.0 FLOPS,
-      (word_embeddings): VocabParallelEmbedding(1, 0.00% Params, 0 MACs, 0.00% MACs, 164.75 us, 0.01% latency, 0.0 FLOPS, )
-      (position_embeddings): Embedding(1, 0.00% Params, 0 MACs, 0.00% MACs, 489.23 us, 0.03% latency, 0.0 FLOPS, 1024, 8192)
-      (embedding_dropout): Dropout(0, 0.00% Params, 0 MACs, 0.00% MACs, 93.94 us, 0.01% latency, 0.0 FLOPS, p=0.1, inplace=False)
-    )
-    (transformer): ParallelTransformer(
-      1.29 M, 100.00% Params, 39584.03 GMACs, 95.91% MACs, 1.81 s, 98.11% latency, 43.78 TFLOPS,
-      (layers): ModuleList(
-        1.28 M, 98.73% Params, 39584.03 GMACs, 95.91% MACs, 1.3 s, 70.66% latency, 60.79 TFLOPS,
-        (0): ParallelTransformerLayerPart1(
-          49.15 k, 3.80% Params, 1099.65 GMACs, 2.66% MACs, 23.5 ms, 1.27% latency, 93.6 TFLOPS,
-          (input_layernorm): FusedLayerNorm(16.38 k, 1.27% Params, 0 MACs, 0.00% MACs, 128.75 us, 0.01% latency, 0.0 FLOPS, torch.Size([8192]), eps=1e-05, elementwise_affine=True)
-          (attention): ParallelSelfAttention(
-            32.77 k, 2.53% Params, 1099.65 GMACs, 2.66% MACs, 22.8 ms, 1.24% latency, 96.46 TFLOPS,
-            (query_key_value): ColumnParallelLinear(24.58 k, 1.90% Params, 824.63 GMACs, 2.00% MACs, 8.93 ms, 0.48% latency, 184.7 TFLOPS, )
-            (scale_mask_softmax): FusedScaleMaskSoftmax(0, 0.00% Params, 134.22 MMACs, 0.00% MACs, 151.16 us, 0.01% latency, 1.78 TFLOPS, )
-            (attention_dropout): Dropout(0, 0.00% Params, 0 MACs, 0.00% MACs, 79.63 us, 0.00% latency, 0.0 FLOPS, p=0.1, inplace=False)
-            (dense): RowParallelLinear(8.19 k, 0.63% Params, 274.88 GMACs, 0.67% MACs, 2.67 ms, 0.14% latency, 205.81 TFLOPS, )
-          )
-        )
-        (1): ParallelTransformerLayerPart2(
-          57.35 k, 4.43% Params, 2199.02 GMACs, 5.33% MACs, 77.53 ms, 4.21% latency, 56.73 TFLOPS,
-          (post_attention_layernorm): FusedLayerNorm(16.38 k, 1.27% Params, 0 MACs, 0.00% MACs, 116.11 us, 0.01% latency, 0.0 FLOPS, torch.Size([8192]), eps=1e-05, elementwise_affine=True)
-          (mlp): ParallelMLP(
-            40.96 k, 3.16% Params, 2199.02 GMACs, 5.33% MACs, 76.19 ms, 4.13% latency, 57.72 TFLOPS,
-            (dense_h_to_4h): ColumnParallelLinear(32.77 k, 2.53% Params, 1099.51 GMACs, 2.66% MACs, 10.79 ms, 0.59% latency, 203.81 TFLOPS, )
-            (dense_4h_to_h): RowParallelLinear(8.19 k, 0.63% Params, 1099.51 GMACs, 2.66% MACs, 14.38 ms, 0.78% latency, 152.95 TFLOPS, )
-          )
-        )
-        ...
-        (23): ParallelTransformerLayerPart2(...)
-      )
-      (final_layernorm): FusedLayerNorm(16.38 k, 1.27% Params, 0 MACs, 0.00% MACs, 110.86 us, 0.01% latency, 0.0 FLOPS, torch.Size([8192]), eps=1e-05, elementwise_affine=True)
-    )
-  )
-)
-------------------------------------------------------------------------------
-```

@@ -19,10 +19,6 @@ class FlopsProfiler(object):
     """Measures the latency, number of estimated floating-point operations and parameters of each module in a PyTorch model.
 
     The flops-profiler profiles the forward pass of a PyTorch model and prints the model graph with the measured profile attached to each module. It shows how latency, flops and parameters are spent in the model and which modules or layers could be the bottleneck. It also outputs the names of the top k modules in terms of aggregated latency, flops, and parameters at depth l with k and l specified by the user. The output profile is computed for each batch of input.
-    The DeepSpeed flops profiler can be used with the DeepSpeed runtime or as a standalone package.
-    When using DeepSpeed for model training, the flops profiler can be configured in the deepspeed_config file and no user code change is required.
-
-    If using the profiler as a standalone package, one imports the flops_profiler package and use the APIs.
 
     Here is an example for usage in a typical training workflow:
 
@@ -270,7 +266,7 @@ class FlopsProfiler(object):
         self.params = total_params
 
         print(
-            "\n-------------------------- DeepSpeed Flops Profiler --------------------------"
+            "\n-------------------------- Flops Profiler --------------------------"
         )
         print(f'Profile Summary at step {profile_step}:')
         print(
@@ -384,7 +380,7 @@ class FlopsProfiler(object):
                 "Each module profile is listed after its name in the following order: \nparams, percentage of total params, MACs, percentage of total MACs, fwd latency, percentage of total fwd latency, fwd FLOPS"
             )
             print(
-                "\nNote: 1. A module can have torch.nn.module or torch.nn.functional to compute logits (e.g. CrossEntropyLoss). They are not counted as submodules, thus not to be printed out. However they make up the difference between a parent's MACs (or latency) and the sum of its submodules'.\n2. Number of floating-point operations is a theoretical estimation, thus FLOPS computed using that could be larger than the maximum system throughput.\n3. The fwd latency listed in the top module's profile is directly captured at the module forward function in PyTorch, thus it's less than the fwd latency shown above which is captured in DeepSpeed.\n"
+                "\nNote: 1. A module can have torch.nn.module or torch.nn.functional to compute logits (e.g. CrossEntropyLoss). They are not counted as submodules, thus not to be printed out. However they make up the difference between a parent's MACs (or latency) and the sum of its submodules'.\n2. Number of floating-point operations is a theoretical estimation, thus FLOPS computed using that could be larger than the maximum system throughput.\n3. The fwd latency listed in the top module's profile is directly captured at the module forward function in PyTorch.\n"
             )
             print(self.model)
 
