@@ -1,17 +1,19 @@
-This repo mirrors [DeepSpeed Flops Profiler](https://github.com/microsoft/DeepSpeed), can be installed by `pip install .`
-# Examples
- * [bert.py](examples/bert.py)
- * [t5.py](examples/t5.py)
- * [vision.py](examples/vision.py)
- * [gpt2.py](examples/gpt2.py)
 # Flops Profiler
 
-> Measures the parameters, latency, and floating-point operations of your model.
+> Measures the parameters, latency, and floating-point operations of PyTorch model.
 
   - [Overview](#overview)
   - [Flops Measurement](#flops-measurement)
   - [Multi-GPU, Multi-node, Data Parallelism, and Model Parallelism](#multi-gpu-multi-node-data-parallelism-and-model-parallelism)
   - [Usage](#usage)
+
+Similar to  [DeepSpeed Flops Profiler](https://github.com/microsoft/DeepSpeed).
+## Examples
+ * [bert.py](examples/bert.py)
+ * [t5.py](examples/t5.py)
+ * [vision.py](examples/vision.py)
+ * [gpt2.py](examples/gpt2.py)
+
 ## Overview
 
 Effective use of hardware resources is critical to good performance, but performance inefficiency in existing implementations for large-scale model training and inference are often hard to spot and attributed to specific module components. The Flops Profiler helps users easily measure both the model training/inference speed (latency, throughput) and efficiency (floating-point operations per second, i.e., FLOPS) of a model and its submodules, with an eye towards eliminating inefficiencies in existing implementations.
@@ -154,8 +156,8 @@ For models running on multi-device or multi-node, only change of the model paral
 
 The Flops Profiler can be used with the DeepSpeed runtime or as a standalone package. When using DeepSpeed for model training, the profiler can be configured in the deepspeed configuration file without user code change. To use the Flops Profiler outside of the DeepSpeed runtime, one can simply install DeepSpeed and import the flops_profiler package to use the APIs directly. Examples of each usage are given below.
 
-- [Examples](#examples)
 - [Flops Profiler](#flops-profiler)
+  - [Examples](#examples)
   - [Overview](#overview)
   - [Flops Measurement](#flops-measurement)
   - [Multi-device, Multi-node, Data Parallelism, and Model Parallelism](#multi-device-multi-node-data-parallelism-and-model-parallelism)

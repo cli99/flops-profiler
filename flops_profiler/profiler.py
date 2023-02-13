@@ -1,11 +1,12 @@
 import time
+from collections import OrderedDict
+from functools import partial
+from typing import List, Optional
+
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from functools import partial
-from typing import List, Optional
-from collections import OrderedDict
-import numpy as np
 
 Tensor = torch.Tensor
 
@@ -247,8 +248,8 @@ class FlopsProfiler(object):
         """
         if not self.started:
             return
-        import sys
         import os.path
+        import sys
         original_stdout = None
         f = None
         if output_file and output_file != "":

@@ -12,7 +12,7 @@ from setuptools import setup, Command
 
 # Package meta-data.
 NAME = 'flops-profiler'
-DESCRIPTION = 'Measure PyTorch model flops, latency, parameters hiearchically at each submodule.'
+DESCRIPTION = 'Measure PyTorch model flops, parameters, and latency hierarchically'
 URL = 'https://github.com/cli99/flops-profiler'
 EMAIL = 'pistasable@gmail.com'
 AUTHOR = 'Cheng Li'
