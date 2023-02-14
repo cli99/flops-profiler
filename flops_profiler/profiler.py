@@ -13,6 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from dataclasses import dataclass, asdict
 from collections import defaultdict
+import json
 
 Tensor = torch.Tensor
 
@@ -23,9 +24,9 @@ old_functions = {}
 
 @dataclass
 class profileEntry:
-    flops: int
-    macs: int
-    duration: float
+    flops: int = 0,
+    macs: int = 0,
+    duration: float = 0.0
 
 class FlopsProfiler:
     """Measures the latency, number of estimated floating-point operations and parameters of each module in a PyTorch model.
@@ -453,35 +454,54 @@ class FlopsProfiler:
             )
 
         def flops_repr(module):
-            params = module.__params__
-            flops = _get_module_flops(module)
-            macs = _get_module_macs(module)
-            profile_table = _get_module_profile_table(module)
-            items = [
-                _params_to_string(params),
-                f'{params / total_params if total_params else 0:.2%} Params',
-                _macs_to_string(macs),
-                f'{0.0 if total_macs == 0 else macs / total_macs:.2%} MACs',
-            ]
-            duration = _get_module_duration(module)
+            mod_params = module.__params__
+            mod_flops = _get_module_flops(module)
+            mod_macs = _get_module_macs(module)
+            mod_duration = _get_module_duration(module)
+            items = []
 
-            items.append(_duration_to_string(duration))
-            items.append(
-                '{:.2%} latency'.format(
-                    0.0 if total_duration == 0 else duration /
-                    total_duration,
-                ),
-            )
-            items.append(
-                _flops_to_string(
-                    0.0 if duration == 0 else flops / duration,
-                ),
-            )
-            profile = str('functionals = ')
-            for name, entry in profile_table.items():
-                profile += f'{name}: {asdict(entry)}, '
-            items.append(profile)
+            mod_profile_str = str('module = ')
+            mod_profile = {}
+            mod_profile.update({
+                'param': _params_to_string(mod_params),
+                'flops': _num_to_string(mod_flops),
+                'macs': _macs_to_string(mod_macs),
+                'duration': _duration_to_string(mod_duration),
+                'FLOPS': _flops_to_string(mod_flops / mod_duration if mod_duration else 0.0),
+                'params%': f'{mod_params / total_params if total_params else 0:.2%}',
+                'flops%': f'{mod_flops / total_flops if total_flops else 0:.2%}',
+                'macs%': f'{mod_macs / total_macs if total_macs else 0:.2%}',
+                'duration%': f'{mod_duration / total_duration if total_duration else 0:.2%}',
+                })
+            mod_profile_str += f'{str(mod_profile)}'
+            items.append(mod_profile_str)
+
+            func_profile_table = _get_module_profile_table(module)
+            func_profile_str = str('functionals = ')
+            func_profile = {}
+            f, m, d = 0, 0, 0.0
+            for name, entry in func_profile_table.items():
+                f += entry.flops
+                m += entry.macs
+                d += entry.duration
+                func_profile[name] = asdict(entry)
+                func_profile[name].update({
+                    'flops': _num_to_string(entry.flops),
+                    'macs': _macs_to_string(entry.macs),
+                    'duration': _duration_to_string(entry.duration),
+                    'FLOPS': _flops_to_string(entry.flops / entry.duration if entry.duration else 0.0),
+                    'flops%': f'{entry.flops / total_flops if total_flops else 0:.2%}',
+                    'macs%': f'{entry.macs / total_macs if total_macs else 0:.2%}',
+                    'duration%': f'{entry.duration / total_duration if total_duration else 0:.2%}',
+                })
+            func_profile_str += str(func_profile)
+            assert f == mod_flops, f'module total flops =! functional flops {f} != {mod_flops}'
+            assert m == mod_macs, f'module total macs =! functional macs{m} != {mod_macs}'
+            items.append(func_profile_str)
+            items.append(f'functionals_total_duration = {_duration_to_string(d)}')
+
             items.append(module.original_extra_repr())
+
             return ', '.join(items)
 
         def add_extra_repr(module):
@@ -528,7 +548,7 @@ class FlopsProfiler:
             sys.stdout = original_stdout
             f.close()
 
-    def print_model_aggregated_profile(self, module_depth: int = -1, top_modules: int = 1):
+    def print_model_aggregated_profile(self, module_depth: int = -1, top_modules: int = 1, top_functionals: int = 1):
         """Prints the names of the top top_modules modules in terms of aggregated time, flops, and parameters at depth module_depth.
 
         Args:
@@ -550,12 +570,16 @@ class FlopsProfiler:
                     0,
                     0,
                     0,
-                ]  # macs, params, time
-            info[curr_depth][module.__class__.__name__][0] += _get_module_macs(
+                    0,
+                ]  # macsparams, time
+            info[curr_depth][module.__class__.__name__][0] += module.__params__
+            info[curr_depth][module.__class__.__name__][1] += _get_module_flops(
                 module,
             )
-            info[curr_depth][module.__class__.__name__][1] += module.__params__
-            info[curr_depth][module.__class__.__name__][2] += _get_module_duration(
+            info[curr_depth][module.__class__.__name__][2] += _get_module_macs(
+                module,
+            )
+            info[curr_depth][module.__class__.__name__][3] += _get_module_duration(
                 module,
             )
             has_children = len(module._modules.items()) != 0
@@ -570,23 +594,22 @@ class FlopsProfiler:
             depth = len(info) - 1
 
         print(
-            f'Top {top_modules} modules in terms of params, MACs or fwd latency at different model depths:',
+            f'Top {top_modules} modules in terms of params, flops, MACs or duration at different model depths:',
         )
 
         for d in range(depth):
             num_items = min(top_modules, len(info[d]))
-
-            sort_macs = {
-                k: _macs_to_string(v[0])
-                for k,
-                v in sorted(
-                    info[d].items(),
-                    key=lambda item: item[1][0],
-                    reverse=True,
-                )[:num_items]
-            }
             sort_params = {
-                k: _params_to_string(v[1])
+                    k: _params_to_string(v[0])
+                    for k,
+                    v in sorted(
+                        info[d].items(),
+                        key=lambda item: item[1][0],
+                        reverse=True,
+                    )[:num_items]
+                }
+            sort_flops = {
+                k: _num_to_string(v[1])
                 for k,
                 v in sorted(
                     info[d].items(),
@@ -594,8 +617,8 @@ class FlopsProfiler:
                     reverse=True,
                 )[:num_items]
             }
-            sort_time = {
-                k: _duration_to_string(v[2])
+            sort_macs = {
+                k: _macs_to_string(v[2])
                 for k,
                 v in sorted(
                     info[d].items(),
@@ -604,8 +627,19 @@ class FlopsProfiler:
                 )[:num_items]
             }
 
+            sort_time = {
+                k: _duration_to_string(v[3])
+                for k,
+                v in sorted(
+                    info[d].items(),
+                    key=lambda item: item[1][3],
+                    reverse=True,
+                )[:num_items]
+            }
+
             print(f'depth {d}:')
             print(f'    params      - {sort_params}')
+            print(f'    flops       - {sort_flops}')
             print(f'    MACs        - {sort_macs}')
             print(f'    fwd latency - {sort_time}')
 
@@ -1339,6 +1373,15 @@ def _get_module_duration(module: nn.Module):
 
 def _get_module_profile_table(module: nn.Module):
     sum_table = module.__profile_table__
+
+    # TODO: tmp fix for duplicated counting
+    if hasattr(module, '__cnt__'):
+        module.__cnt__ += 1
+    else:
+        module.__cnt__ = 1
+    if module.__cnt__ > 1:
+        return sum_table
+
     # iterate over immediate children modules
     for child in module.children():
         table = _get_module_profile_table(child)
