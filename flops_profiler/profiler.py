@@ -11,13 +11,21 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from dataclasses import dataclass, asdict
+from collections import defaultdict
 
 Tensor = torch.Tensor
 
 module_flop_count = []
 module_mac_count = []
+module_profile_lists = []
 old_functions = {}
 
+@dataclass
+class profileEntry:
+    flops: int
+    macs: int
+    duration: float
 
 class FlopsProfiler:
     """Measures the latency, number of estimated floating-point operations and parameters of each module in a PyTorch model.
@@ -86,6 +94,7 @@ class FlopsProfiler:
             def pre_hook(module, input):
                 module_flop_count.append([])
                 module_mac_count.append([])
+                module_profile_lists.append([])
 
             if not hasattr(module, '__pre_hook_handle__'):
                 module.__pre_hook_handle__ = module.register_forward_pre_hook(
@@ -104,6 +113,12 @@ class FlopsProfiler:
                         for elem in module_mac_count[-1]
                     ])
                     module_mac_count.pop()
+                if module_profile_lists:
+                    lst = module_profile_lists.pop()
+                    for name, entry in lst:
+                        module.__profile_table__[name].flops += entry.flops
+                        module.__profile_table__[name].macs += entry.macs
+                        module.__profile_table__[name].duration += entry.duration
 
             if not hasattr(module, '__post_hook_handle__'):
                 module.__post_hook_handle__ = module.register_forward_hook(
@@ -172,6 +187,7 @@ class FlopsProfiler:
             module.__params__ = sum(p.numel() for p in module.parameters())
             module.__start_time__ = 0
             module.__duration__ = 0
+            module.__profile_table__ = defaultdict(lambda: profileEntry(0, 0, 0.0))
 
         self.model.apply(add_or_reset_attrs)
 
@@ -196,6 +212,8 @@ class FlopsProfiler:
                 del module.__start_time__
             if hasattr(module, '__duration__'):
                 del module.__duration__
+            if hasattr(module, '__profile_table__'):
+                del module.__profile_table__
 
         self.model.apply(remove_profile_attrs)
 
@@ -438,6 +456,7 @@ class FlopsProfiler:
             params = module.__params__
             flops = _get_module_flops(module)
             macs = _get_module_macs(module)
+            profile_table = _get_module_profile_table(module)
             items = [
                 _params_to_string(params),
                 f'{params / total_params if total_params else 0:.2%} Params',
@@ -458,6 +477,10 @@ class FlopsProfiler:
                     0.0 if duration == 0 else flops / duration,
                 ),
             )
+            profile = str('functionals = ')
+            for name, entry in profile_table.items():
+                profile += f'{name}: {asdict(entry)}, '
+            items.append(profile)
             items.append(module.original_extra_repr())
             return ', '.join(items)
 
@@ -919,14 +942,19 @@ def _wrapFunc(func, funcFlopCompute):
     oldFunc = func
     name = func.__str__
     old_functions[name] = oldFunc
-
+    func_name = func.__name__
     def newFunc(*args, **kwds):
         flops, macs = funcFlopCompute(*args, **kwds)
         if module_flop_count:
             module_flop_count[-1].append((name, flops))
         if module_mac_count and macs:
             module_mac_count[-1].append((name, macs))
-        return oldFunc(*args, **kwds)
+        start = time.time()
+        ret = oldFunc(*args, **kwds)
+        duration = time.time() - start
+        if module_profile_lists:
+            module_profile_lists[-1].append((func_name, profileEntry(flops, macs, duration)))
+        return ret
 
     newFunc.__str__ = func.__str__
 
@@ -1308,6 +1336,17 @@ def _get_module_duration(module: nn.Module):
         for m in module.children():
             duration += m.__duration__
     return duration
+
+def _get_module_profile_table(module: nn.Module):
+    sum_table = module.__profile_table__
+    # iterate over immediate children modules
+    for child in module.children():
+        table = _get_module_profile_table(child)
+        for name, entry in table.items():
+            sum_table[name].flops += entry.flops
+            sum_table[name].macs += entry.macs
+            sum_table[name].duration += entry.duration
+    return sum_table
 
 
 def get_model_profile(
