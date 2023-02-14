@@ -254,6 +254,19 @@ class FlopsProfiler:
         total_duration = _get_module_duration(self.model)
         return _duration_to_string(total_duration) if as_string else total_duration
 
+    def get_total_functional_duration(self, as_string: bool = False):
+        """Returns the total duration of the nn.functional calls in the model forward pass.
+
+        Args:
+            as_string (bool, optional): whether to output the duration as string. Defaults to False.
+
+        Returns:
+            The total latency of the nn.functional calls.
+        """
+        table = _get_module_profile_table(self.model)
+        total_duration = sum([table[func_name].duration for func_name in table])
+        return _duration_to_string(total_duration) if as_string else total_duration
+
     def get_total_params(self, as_string: bool = False):
         """Returns the total parameters of the model.
 
@@ -301,6 +314,7 @@ class FlopsProfiler:
         total_flops = self.get_total_flops()
         total_macs = self.get_total_macs()
         total_duration = self.get_total_duration()
+        total_functation_duration = self.get_total_functional_duration()
         total_params = self.get_total_params()
 
         self.flops = total_flops
@@ -492,13 +506,14 @@ class FlopsProfiler:
                     'FLOPS': _flops_to_string(entry.flops / entry.duration if entry.duration else 0.0),
                     'flops%': f'{entry.flops / total_flops if total_flops else 0:.2%}',
                     'macs%': f'{entry.macs / total_macs if total_macs else 0:.2%}',
-                    'duration%': f'{entry.duration / total_duration if total_duration else 0:.2%}',
+                    'duration%/allfuncs': f'{entry.duration / total_functation_duration if total_functation_duration else 0:.2%}',
+                    'duration%/e2e': f'{entry.duration / total_duration if total_duration else 0:.2%}',
                 })
             func_profile_str += str(func_profile)
             assert f == mod_flops, f'module total flops =! functional flops {f} != {mod_flops}'
             assert m == mod_macs, f'module total macs =! functional macs{m} != {mod_macs}'
             items.append(func_profile_str)
-            items.append(f'functionals_total_duration = {_duration_to_string(d)}')
+            items.append(f'functionals_duration = {_duration_to_string(d)}')
 
             items.append(module.original_extra_repr())
 
@@ -519,7 +534,7 @@ class FlopsProfiler:
         self.model.apply(add_extra_repr)
 
         print(
-            '\n----------------------------- Aggregated Profile per device -----------------------------',
+            '\n----------------------------- Aggregated Profile per Device -----------------------------',
         )
         self.print_model_aggregated_profile(
             module_depth=module_depth,
@@ -528,7 +543,7 @@ class FlopsProfiler:
 
         if detailed:
             print(
-                '\n------------------------------ Detailed Profile per device ------------------------------',
+                '\n------------------------------ Detailed Profile per Device ------------------------------',
             )
             print(
                 'Each module profile is listed after its name in the following order: \nparams, percentage of total params, MACs, percentage of total MACs, fwd latency, percentage of total fwd latency, fwd FLOPS',
