@@ -1326,17 +1326,17 @@ def _duration_to_string(duration, units=None, precision=2):
 
 def _get_module_flops(module: nn.Module):
     sum = module.__flops__
-    if hasattr(module, '__cnt__'):
-        module.__cnt__ += 1
-    else:
-        module.__cnt__ = 1
-    if  module.__class__.__name__ == 'BertSelfOutput':
-        print('flops - before', module.__cnt__, sum)
+    # if hasattr(module, '__cnt__'):
+    #     module.__cnt__ += 1
+    # else:
+    #     module.__cnt__ = 1
+    # if  module.__class__.__name__ == 'BertSelfOutput':
+    #     print('flops - before', module.__cnt__, sum)
     # iterate over immediate children modules
     for child in module.children():
         sum += _get_module_flops(child)
-    if  module.__class__.__name__ == 'BertSelfOutput':
-        print('flops - after', module.__cnt__, sum)
+    # if  module.__class__.__name__ == 'BertSelfOutput':
+    #     print('flops - after', module.__cnt__, sum)
     return sum
 
 
@@ -1361,10 +1361,10 @@ def _get_module_profile_table(module: nn.Module):
         module.__cnt__ += 1
     else:
         module.__cnt__ = 1
-    if  module.__class__.__name__ == 'BertSelfOutput':
-        print('profile - before', module.__cnt__, sum_table)
-    # if module.__cnt__ > 1:
-        # return sum_table
+    # if  module.__class__.__name__ == 'BertSelfOutput':
+    #     print('profile - before', module.__cnt__, sum_table)
+    if module.__cnt__ > 1:
+        return sum_table
     # iterate over immediate children modules
     for child in module.children():
         table = _get_module_profile_table(child)
@@ -1375,8 +1375,8 @@ def _get_module_profile_table(module: nn.Module):
                 sum_table[name].flops += entry.flops
                 sum_table[name].macs += entry.macs
                 sum_table[name].duration += entry.duration
-    if  module.__class__.__name__ == 'BertSelfOutput':
-        print('profile - after', module.__cnt__, sum_table)
+    # if  module.__class__.__name__ == 'BertSelfOutput':
+    #     print('profile - after', module.__cnt__, sum_table)
     # return copy.deepcopy(sum_table)
     return sum_table
 

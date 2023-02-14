@@ -33,7 +33,7 @@ device = torch.device('cuda:0') if torch.cuda.is_available(
 tokenizer = AutoTokenizer.from_pretrained(name)
 config = AutoConfig.from_pretrained(name)
 model = AutoModel.from_config(config)
-model.encoder.layer = model.encoder.layer[:1]
+# model.encoder.layer = model.encoder.layer[:1]
 model = model.to(device)
 
 batch_size = 1
