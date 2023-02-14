@@ -33,6 +33,7 @@ device = torch.device('cuda:0') if torch.cuda.is_available(
 tokenizer = AutoTokenizer.from_pretrained(name)
 config = AutoConfig.from_pretrained(name)
 model = AutoModel.from_config(config)
+model.encoder.layer = model.encoder.layer[:1]
 model = model.to(device)
 
 batch_size = 1
@@ -43,6 +44,7 @@ flops, macs, params = get_model_profile(
     kwargs=bert_input_constructor(batch_size, seq_len, tokenizer, device),
     print_profile=True,
     detailed=True,
+    warm_up=0,
 )
 
 utils.print_output(flops, macs, params)

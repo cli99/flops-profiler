@@ -13,6 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from dataclasses import dataclass, asdict
 from collections import defaultdict
+import copy
 
 Tensor = torch.Tensor
 
@@ -23,9 +24,9 @@ old_functions = {}
 
 @dataclass
 class profileEntry:
-    flops: int
-    macs: int
-    duration: float
+    flops: int = 0
+    macs: int = 0
+    duration: float = 0.0
 
 class FlopsProfiler:
     """Measures the latency, number of estimated floating-point operations and parameters of each module in a PyTorch model.
@@ -116,9 +117,12 @@ class FlopsProfiler:
                 if module_profile_lists:
                     lst = module_profile_lists.pop()
                     for name, entry in lst:
-                        module.__profile_table__[name].flops += entry.flops
-                        module.__profile_table__[name].macs += entry.macs
-                        module.__profile_table__[name].duration += entry.duration
+                        if name not in module.__profile_table__:
+                            module.__profile_table__[name] = profileEntry(entry.flops, entry.macs, entry.duration)
+                        else:
+                            module.__profile_table__[name].flops += entry.flops
+                            module.__profile_table__[name].macs += entry.macs
+                            module.__profile_table__[name].duration += entry.duration
 
             if not hasattr(module, '__post_hook_handle__'):
                 module.__post_hook_handle__ = module.register_forward_hook(
@@ -187,7 +191,7 @@ class FlopsProfiler:
             module.__params__ = sum(p.numel() for p in module.parameters())
             module.__start_time__ = 0
             module.__duration__ = 0
-            module.__profile_table__ = defaultdict(lambda: profileEntry(0, 0, 0.0))
+            module.__profile_table__ = defaultdict(lambda: profileEntry())
 
         self.model.apply(add_or_reset_attrs)
 
@@ -458,10 +462,12 @@ class FlopsProfiler:
             macs = _get_module_macs(module)
             profile_table = _get_module_profile_table(module)
             items = [
+                str(flops),
+                # _macs_to_string(macs),
+                str(macs),
+                f'{0.0 if total_macs == 0 else macs / total_macs:.2%} MACs',
                 _params_to_string(params),
                 f'{params / total_params if total_params else 0:.2%} Params',
-                _macs_to_string(macs),
-                f'{0.0 if total_macs == 0 else macs / total_macs:.2%} MACs',
             ]
             duration = _get_module_duration(module)
 
@@ -478,6 +484,10 @@ class FlopsProfiler:
                 ),
             )
             profile = str('functionals = ')
+            f = sum([entry.flops for name, entry in profile_table.items()])
+            m = sum([entry.macs for name, entry in profile_table.items()])
+            profile += f'{f}, {m}, '
+
             for name, entry in profile_table.items():
                 profile += f'{name}: {asdict(entry)}, '
             items.append(profile)
@@ -1316,9 +1326,17 @@ def _duration_to_string(duration, units=None, precision=2):
 
 def _get_module_flops(module: nn.Module):
     sum = module.__flops__
+    if hasattr(module, '__cnt__'):
+        module.__cnt__ += 1
+    else:
+        module.__cnt__ = 1
+    if  module.__class__.__name__ == 'BertSelfOutput':
+        print('flops - before', module.__cnt__, sum)
     # iterate over immediate children modules
     for child in module.children():
         sum += _get_module_flops(child)
+    if  module.__class__.__name__ == 'BertSelfOutput':
+        print('flops - after', module.__cnt__, sum)
     return sum
 
 
@@ -1339,13 +1357,27 @@ def _get_module_duration(module: nn.Module):
 
 def _get_module_profile_table(module: nn.Module):
     sum_table = module.__profile_table__
+    if hasattr(module, '__cnt__'):
+        module.__cnt__ += 1
+    else:
+        module.__cnt__ = 1
+    if  module.__class__.__name__ == 'BertSelfOutput':
+        print('profile - before', module.__cnt__, sum_table)
+    # if module.__cnt__ > 1:
+        # return sum_table
     # iterate over immediate children modules
     for child in module.children():
         table = _get_module_profile_table(child)
         for name, entry in table.items():
-            sum_table[name].flops += entry.flops
-            sum_table[name].macs += entry.macs
-            sum_table[name].duration += entry.duration
+            if name not in sum_table:
+                sum_table[name] = profileEntry(entry.flops, entry.macs, entry.duration)
+            else:
+                sum_table[name].flops += entry.flops
+                sum_table[name].macs += entry.macs
+                sum_table[name].duration += entry.duration
+    if  module.__class__.__name__ == 'BertSelfOutput':
+        print('profile - after', module.__cnt__, sum_table)
+    # return copy.deepcopy(sum_table)
     return sum_table
 
 
