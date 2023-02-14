@@ -1,4 +1,5 @@
 from __future__ import annotations
+from typing import List, Set, Tuple, Dict
 
 import time
 from collections import OrderedDict
@@ -51,13 +52,13 @@ class FlopsProfiler:
         object (torch.nn.Module): The PyTorch model to profile.
     """
 
-    def __init__(self, model, ds_engine=None):
+    def __init__(self, model: nn.Module, ds_engine=None):
         self.model = model
         self.ds_engine = ds_engine
         self.started = False
         self.func_patched = False
 
-    def start_profile(self, ignore_list=None):
+    def start_profile(self, ignore_list: list[nn.Module]| None = None):
         """Starts profiling.
 
         Extra attributes are added recursively to all the modules and the profiled torch.nn.functionals are monkey patched.
@@ -198,7 +199,7 @@ class FlopsProfiler:
 
         self.model.apply(remove_profile_attrs)
 
-    def get_total_flops(self, as_string=False):
+    def get_total_flops(self, as_string: bool = False):
         """Returns the total flops of the model.
 
         Args:
@@ -210,7 +211,7 @@ class FlopsProfiler:
         total_flops = _get_module_flops(self.model)
         return _num_to_string(total_flops) if as_string else total_flops
 
-    def get_total_macs(self, as_string=False):
+    def get_total_macs(self, as_string: bool = False):
         """Returns the total MACs of the model.
 
         Args:
@@ -222,7 +223,7 @@ class FlopsProfiler:
         total_macs = _get_module_macs(self.model)
         return _macs_to_string(total_macs) if as_string else total_macs
 
-    def get_total_duration(self, as_string=False):
+    def get_total_duration(self, as_string: bool = False):
         """Returns the total duration of the model forward pass.
 
         Args:
@@ -234,7 +235,7 @@ class FlopsProfiler:
         total_duration = _get_module_duration(self.model)
         return _duration_to_string(total_duration) if as_string else total_duration
 
-    def get_total_params(self, as_string=False):
+    def get_total_params(self, as_string: bool = False):
         """Returns the total parameters of the model.
 
         Args:
@@ -249,11 +250,11 @@ class FlopsProfiler:
 
     def print_model_profile(
         self,
-        profile_step=1,
-        module_depth=-1,
-        top_modules=1,
-        detailed=True,
-        output_file=None,
+        profile_step: int = 1,
+        module_depth: int = -1,
+        top_modules: int =1,
+        detailed: bool = True,
+        output_file: str|None = None,
     ):
         """Prints the model graph with the measured profile attached to each module.
 
@@ -504,7 +505,7 @@ class FlopsProfiler:
             sys.stdout = original_stdout
             f.close()
 
-    def print_model_aggregated_profile(self, module_depth=-1, top_modules=1):
+    def print_model_aggregated_profile(self, module_depth: int = -1, top_modules: int = 1):
         """Prints the names of the top top_modules modules in terms of aggregated time, flops, and parameters at depth module_depth.
 
         Args:
@@ -586,7 +587,7 @@ class FlopsProfiler:
             print(f'    fwd latency - {sort_time}')
 
 
-def _prod(dims):
+def _prod(dims: int):
     p = 1
     for v in dims:
         p *= v
@@ -726,7 +727,7 @@ def _conv_trans_flops_compute(
     strides = stride if type(stride) is tuple else (stride, stride)
     dilations = dilation if type(dilation) is tuple else (dilation, dilation)
 
-    filters_per_channel = out_channels // groups
+    filters_per_channel = out_channels // grofups
     conv_per_position_macs = int(
         _prod(kernel_dims),
     ) * in_channels * filters_per_channel
@@ -1285,7 +1286,7 @@ def _duration_to_string(duration, units=None, precision=2):
     # since modules() returns duplicate modules only once
 
 
-def _get_module_flops(module):
+def _get_module_flops(module: nn.Module):
     sum = module.__flops__
     # iterate over immediate children modules
     for child in module.children():
@@ -1293,7 +1294,7 @@ def _get_module_flops(module):
     return sum
 
 
-def _get_module_macs(module):
+def _get_module_macs(module: nn.Module):
     sum = module.__macs__
     # iterate over immediate children modules
     for child in module.children():
@@ -1301,7 +1302,7 @@ def _get_module_macs(module):
     return sum
 
 
-def _get_module_duration(module):
+def _get_module_duration(module: nn.Module):
     duration = module.__duration__
     if duration == 0:  # e.g. ModuleList
         for m in module.children():
@@ -1310,19 +1311,19 @@ def _get_module_duration(module):
 
 
 def get_model_profile(
-    model,
-    input_shape=None,
-    args=[],
+    model: nn.Module,
+    input_shape: tuple|None =None,
+    args= [],
     kwargs={},
-    print_profile=True,
-    detailed=True,
-    module_depth=-1,
-    top_modules=10,
-    warm_up=3,
-    as_string=False,
-    output_file=None,
-    ignore_modules=None,
-    func_name='forward',
+    print_profile: bool = True,
+    detailed: bool = True,
+    module_depth: int = -1,
+    top_modules: int = 10,
+    warm_up: int = 3,
+    as_string: bool = False,
+    output_file: str|None = None,
+    ignore_modules: List[nn.Module]|None = None,
+    func_name: str = 'forward',
 ):
     """Returns the total floating-point operations, MACs, and parameters of a model.
 
