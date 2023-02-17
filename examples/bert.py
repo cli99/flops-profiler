@@ -4,9 +4,7 @@ from functools import partial
 
 import torch
 import utils
-from transformers import AutoConfig
-from transformers import AutoModel
-from transformers import AutoTokenizer
+from transformers import AutoConfig, AutoModel, AutoTokenizer
 
 from flops_profiler.profiler import get_model_profile
 
@@ -43,6 +41,7 @@ flops, macs, params = get_model_profile(
     kwargs=bert_input_constructor(batch_size, seq_len, tokenizer, device),
     print_profile=True,
     detailed=True,
+    as_string=True,
 )
 
 utils.print_output(flops, macs, params)
