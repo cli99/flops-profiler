@@ -10,7 +10,7 @@ from flops_profiler.profiler import get_model_profile
 
 tokenizer = T5Tokenizer.from_pretrained('t5-small')
 model = T5ForConditionalGeneration.from_pretrained('t5-small')
-use_cuda = True
+use_cuda = False
 device = torch.device('cuda:0') if torch.cuda.is_available(
 ) and use_cuda else torch.device('cpu')
 model = model.to(device)

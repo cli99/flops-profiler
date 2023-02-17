@@ -2,10 +2,7 @@ from __future__ import annotations
 
 import torch
 import utils
-from transformers import AutoConfig
-from transformers import AutoModel
-from transformers import GPT2Model
-from transformers import GPT2Tokenizer
+from transformers import AutoConfig, AutoModel, GPT2Model, GPT2LMHeadModel, GPT2Tokenizer
 
 from flops_profiler.profiler import get_model_profile
 
@@ -13,8 +10,8 @@ name = 'gpt2'
 use_cuda = True
 device = torch.device('cuda:0') if torch.cuda.is_available(
 ) and use_cuda else torch.device('cpu')
-config = AutoConfig.from_pretrained(name)
-model = AutoModel.from_config(config)
+config = GPT2Tokenizer.from_pretrained(name)
+model = GPT2LMHeadModel.from_pretrained(name)
 model = model.to(device)
 
 batch_size = 1

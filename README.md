@@ -19,9 +19,8 @@
       - [Example: AlexNet](#example-alexnet)
     - [In Model Training Workflow](#in-model-training-workflow)
       - [Example Training Workflow](#example-training-workflow)
-    - [Usage With the DeepSpeed Runtime](#usage-with-the-deepspeed-runtime)
 
-Similar to  [DeepSpeed Flops Profiler](https://github.com/microsoft/DeepSpeed).
+Similar to  [DeepSpeed Flops Profiler](https://github.com/microsoft/DeepSpeed) and more verbose, shows all intra-module functional information at module level.
 
 ## Install
 
@@ -38,6 +37,8 @@ Effective use of hardware resources is critical to good performance, but perform
 Below is an example output for BERT-base on an A6000 GPU with batch size `1` and sequence length `128` (see [bert.py](examples/bert.py)):
 
 ```shell
+MLFlow does not exist. Disabling MLFlow logging
+
 -------------------------- Flops Profiler --------------------------
 Profile Summary at step 3:
 Notations:
@@ -52,37 +53,43 @@ params of model = params per device * mp_size:                109.48 M
 fwd MACs per device:                                          11.17 GMACs
 fwd flops per device:                                         22.36 G
 fwd flops of model = fwd flops per device * mp_size:          22.36 G
-fwd latency:                                                  11.95 ms
-fwd FLOPS per device = fwd flops per device / fwd latency:    1.87 TFLOPS
+fwd latency:                                                  12.22 ms
+fwd FLOPS per device = fwd flops per device / fwd latency:    1.83 TFLOPS
 
------------------------------ Aggregated Profile per device -----------------------------
-Top 10 modules in terms of params, MACs or fwd latency at different model depths:
+----------------------------- Aggregated Profile per Device -----------------------------
+Top 10 modules in terms of params, flops, MACs or duration at different model depths:
 depth 0:
     params      - {'BertModel': '109.48 M'}
+    flops       - {'BertModel': '22.36 G'}
     MACs        - {'BertModel': '11.17 GMACs'}
-    fwd latency - {'BertModel': '11.95 ms'}
+    fwd latency - {'BertModel': '12.22 ms'}
 depth 1:
     params      - {'BertEncoder': '85.05 M', 'BertEmbeddings': '23.84 M', 'BertPooler': '590.59 k'}
+    flops       - {'BertEncoder': '22.36 G', 'BertPooler': '1.18 M', 'BertEmbeddings': '491.52 K'}
     MACs        - {'BertEncoder': '11.17 GMACs', 'BertPooler': '589.82 KMACs', 'BertEmbeddings': '0 MACs'}
-    fwd latency - {'BertEncoder': '11.67 ms', 'BertEmbeddings': '190.5 us', 'BertPooler': '91.08 us'}
+    fwd latency - {'BertEncoder': '11.93 ms', 'BertEmbeddings': '194.79 us', 'BertPooler': '92.98 us'}
 depth 2:
     params      - {'ModuleList': '85.05 M', 'Embedding': '23.84 M', 'Linear': '590.59 k', 'LayerNorm': '1.54 k', 'Dropout': '0', 'Tanh': '0'}
+    flops       - {'ModuleList': '22.36 G', 'Linear': '1.18 M', 'LayerNorm': '491.52 K', 'Embedding': '0', 'Dropout': '0', 'Tanh': '0'}
     MACs        - {'ModuleList': '11.17 GMACs', 'Linear': '589.82 KMACs', 'Embedding': '0 MACs', 'LayerNorm': '0 MACs', 'Dropout': '0 MACs', 'Tanh': '0 MACs'}
-    fwd latency - {'ModuleList': '11.58 ms', 'Embedding': '81.54 us', 'Linear': '42.2 us', 'LayerNorm': '30.28 us', 'Tanh': '22.17 us', 'Dropout': '11.92 us'}
+    fwd latency - {'ModuleList': '11.85 ms', 'Embedding': '86.07 us', 'Linear': '43.87 us', 'LayerNorm': '31.71 us', 'Tanh': '20.74 us', 'Dropout': '11.68 us'}
 depth 3:
     params      - {'BertLayer': '85.05 M'}
+    flops       - {'BertLayer': '22.36 G'}
     MACs        - {'BertLayer': '11.17 GMACs'}
-    fwd latency - {'BertLayer': '11.58 ms'}
+    fwd latency - {'BertLayer': '11.85 ms'}
 depth 4:
     params      - {'BertAttention': '28.37 M', 'BertIntermediate': '28.35 M', 'BertOutput': '28.34 M'}
+    flops       - {'BertAttention': '7.86 G', 'BertOutput': '7.25 G', 'BertIntermediate': '7.25 G'}
     MACs        - {'BertAttention': '3.93 GMACs', 'BertIntermediate': '3.62 GMACs', 'BertOutput': '3.62 GMACs'}
-    fwd latency - {'BertAttention': '8.42 ms', 'BertOutput': '1.39 ms', 'BertIntermediate': '1.22 ms'}
+    fwd latency - {'BertAttention': '8.59 ms', 'BertOutput': '1.47 ms', 'BertIntermediate': '1.23 ms'}
 depth 5:
     params      - {'Linear': '56.67 M', 'BertSelfAttention': '21.26 M', 'BertSelfOutput': '7.11 M', 'LayerNorm': '18.43 k', 'GELUActivation': '0', 'Dropout': '0'}
+    flops       - {'Linear': '14.5 G', 'BertSelfAttention': '6.04 G', 'BertSelfOutput': '1.82 G', 'LayerNorm': '5.9 M', 'GELUActivation': '0', 'Dropout': '0'}
     MACs        - {'Linear': '7.25 GMACs', 'BertSelfAttention': '3.02 GMACs', 'BertSelfOutput': '905.97 MMACs', 'GELUActivation': '0 MACs', 'LayerNorm': '0 MACs', 'Dropout': '0 MACs'}
-    fwd latency - {'BertSelfAttention': '5.42 ms', 'BertSelfOutput': '2.79 ms', 'Linear': '1.2 ms', 'LayerNorm': '360.49 us', 'GELUActivation': '340.7 us', 'Dropout': '124.45 us'}
+    fwd latency - {'BertSelfAttention': '5.6 ms', 'BertSelfOutput': '2.79 ms', 'Linear': '1.25 ms', 'LayerNorm': '404.6 us', 'GELUActivation': '338.32 us', 'Dropout': '123.5 us'}
 
------------------------------- Detailed Profile per device ------------------------------
+------------------------------ Detailed Profile per Device ------------------------------
 Each module profile is listed after its name in the following order:
 params, percentage of total params, MACs, percentage of total MACs, fwd latency, percentage of total fwd latency, fwd FLOPS
 
@@ -91,57 +98,57 @@ Note: 1. A module can have torch.nn.module or torch.nn.functional to compute log
 3. The fwd latency listed in the top module's profile is directly captured at the module forward function in PyTorch.
 
 BertModel(
-  109.48 M, 100.00% Params, 11.17 GMACs, 100.00% MACs, 11.95 ms, 100.00% latency, 1.87 TFLOPS,
+  module = {'param': '109.48 M', 'flops': '22.36 G', 'macs': '11.17 GMACs', 'duration': '12.22 ms', 'FLOPS': '1.83 TFLOPS', 'params%': '100.00%', 'flops%': '100.00%', 'macs%': '100.00%', 'duration%': '100.00%'}, functionals = {'embedding': {'flops': '0', 'macs': '0 MACs', 'duration': '45.3 us', 'FLOPS': '0.0 FLOPS', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%/allfuncs': '0.71%', 'duration%/e2e': '0.37%'}, 'layer_norm': {'flops': '12.29 M', 'macs': '0 MACs', 'duration': '502.11 us', 'FLOPS': '24.47 GFLOPS', 'flops%': '0.05%', 'macs%': '0.00%', 'duration%/allfuncs': '7.86%', 'duration%/e2e': '4.11%'}, 'matmul': {'flops': '603.98 M', 'macs': '301.99 MMACs', 'duration': '759.84 us', 'FLOPS': '794.88 GFLOPS', 'flops%': '2.70%', 'macs%': '2.70%', 'duration%/allfuncs': '11.89%', 'duration%/e2e': '6.22%'}, 'softmax': {'flops': '2.36 M', 'macs': '0 MACs', 'duration': '129.94 us', 'FLOPS': '18.16 GFLOPS', 'flops%': '0.01%', 'macs%': '0.00%', 'duration%/allfuncs': '2.03%', 'duration%/e2e': '1.06%'}, 'linear': {'flops': '21.74 G', 'macs': '10.87 GMACs', 'duration': '4.95 ms', 'FLOPS': '4.39 TFLOPS', 'flops%': '97.23%', 'macs%': '97.30%', 'duration%/allfuncs': '77.51%', 'duration%/e2e': '40.53%'}}, functionals_duration = 6.39 ms,
   (embeddings): BertEmbeddings(
-    23.84 M, 21.77% Params, 0 MACs, 0.00% MACs, 190.5 us, 1.59% latency, 2.58 GFLOPS,
-    (word_embeddings): Embedding(23.44 M, 21.41% Params, 0 MACs, 0.00% MACs, 33.38 us, 0.28% latency, 0.0 FLOPS, 30522, 768, padding_idx=0)
-    (position_embeddings): Embedding(393.22 k, 0.36% Params, 0 MACs, 0.00% MACs, 26.94 us, 0.23% latency, 0.0 FLOPS, 512, 768)
-    (token_type_embeddings): Embedding(1.54 k, 0.00% Params, 0 MACs, 0.00% MACs, 21.22 us, 0.18% latency, 0.0 FLOPS, 2, 768)
-    (LayerNorm): LayerNorm(1.54 k, 0.00% Params, 0 MACs, 0.00% MACs, 30.28 us, 0.25% latency, 16.23 GFLOPS, (768,), eps=1e-12, elementwise_affine=True)
-    (dropout): Dropout(0, 0.00% Params, 0 MACs, 0.00% MACs, 11.92 us, 0.10% latency, 0.0 FLOPS, p=0.1, inplace=False)
+    module = {'param': '23.84 M', 'flops': '491.52 K', 'macs': '0 MACs', 'duration': '194.79 us', 'FLOPS': '2.52 GFLOPS', 'params%': '21.77%', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%': '1.59%'}, functionals = {'embedding': {'flops': '0', 'macs': '0 MACs', 'duration': '45.3 us', 'FLOPS': '0.0 FLOPS', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%/allfuncs': '0.71%', 'duration%/e2e': '0.37%'}, 'layer_norm': {'flops': '491.52 K', 'macs': '0 MACs', 'duration': '18.36 us', 'FLOPS': '26.77 GFLOPS', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%/allfuncs': '0.29%', 'duration%/e2e': '0.15%'}}, functionals_duration = 63.66 us,
+    (word_embeddings): Embedding(module = {'param': '23.44 M', 'flops': '0', 'macs': '0 MACs', 'duration': '37.91 us', 'FLOPS': '0.0 FLOPS', 'params%': '21.41%', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%': '0.31%'}, functionals = {'embedding': {'flops': '0', 'macs': '0 MACs', 'duration': '19.55 us', 'FLOPS': '0.0 FLOPS', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%/allfuncs': '0.31%', 'duration%/e2e': '0.16%'}}, functionals_duration = 19.55 us, 30522, 768, padding_idx=0)
+    (position_embeddings): Embedding(module = {'param': '393.22 k', 'flops': '0', 'macs': '0 MACs', 'duration': '24.08 us', 'FLOPS': '0.0 FLOPS', 'params%': '0.36%', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%': '0.20%'}, functionals = {'embedding': {'flops': '0', 'macs': '0 MACs', 'duration': '13.11 us', 'FLOPS': '0.0 FLOPS', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%/allfuncs': '0.21%', 'duration%/e2e': '0.11%'}}, functionals_duration = 13.11 us, 512, 768)
+    (token_type_embeddings): Embedding(module = {'param': '1.54 k', 'flops': '0', 'macs': '0 MACs', 'duration': '24.08 us', 'FLOPS': '0.0 FLOPS', 'params%': '0.00%', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%': '0.20%'}, functionals = {'embedding': {'flops': '0', 'macs': '0 MACs', 'duration': '12.64 us', 'FLOPS': '0.0 FLOPS', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%/allfuncs': '0.20%', 'duration%/e2e': '0.10%'}}, functionals_duration = 12.64 us, 2, 768)
+    (LayerNorm): LayerNorm(module = {'param': '1.54 k', 'flops': '491.52 K', 'macs': '0 MACs', 'duration': '31.71 us', 'FLOPS': '15.5 GFLOPS', 'params%': '0.00%', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%': '0.26%'}, functionals = {'layer_norm': {'flops': '491.52 K', 'macs': '0 MACs', 'duration': '18.36 us', 'FLOPS': '26.77 GFLOPS', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%/allfuncs': '0.29%', 'duration%/e2e': '0.15%'}}, functionals_duration = 18.36 us, (768,), eps=1e-12, elementwise_affine=True)
+    (dropout): Dropout(module = {'param': '0', 'flops': '0', 'macs': '0 MACs', 'duration': '11.68 us', 'FLOPS': '0.0 FLOPS', 'params%': '0.00%', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%': '0.10%'}, functionals = {}, functionals_duration = 0.0, p=0.1, inplace=False)
   )
   (encoder): BertEncoder(
-    85.05 M, 77.69% Params, 11.17 GMACs, 99.99% MACs, 11.67 ms, 97.64% latency, 1.92 TFLOPS,
+    module = {'param': '85.05 M', 'flops': '22.36 G', 'macs': '11.17 GMACs', 'duration': '11.93 ms', 'FLOPS': '1.87 TFLOPS', 'params%': '77.69%', 'flops%': '99.99%', 'macs%': '99.99%', 'duration%': '97.64%'}, functionals = {'matmul': {'flops': '603.98 M', 'macs': '301.99 MMACs', 'duration': '759.84 us', 'FLOPS': '794.88 GFLOPS', 'flops%': '2.70%', 'macs%': '2.70%', 'duration%/allfuncs': '11.89%', 'duration%/e2e': '6.22%'}, 'softmax': {'flops': '2.36 M', 'macs': '0 MACs', 'duration': '129.94 us', 'FLOPS': '18.16 GFLOPS', 'flops%': '0.01%', 'macs%': '0.00%', 'duration%/allfuncs': '2.03%', 'duration%/e2e': '1.06%'}, 'linear': {'flops': '21.74 G', 'macs': '10.87 GMACs', 'duration': '4.92 ms', 'FLOPS': '4.42 TFLOPS', 'flops%': '97.23%', 'macs%': '97.29%', 'duration%/allfuncs': '77.05%', 'duration%/e2e': '40.29%'}, 'layer_norm': {'flops': '11.8 M', 'macs': '0 MACs', 'duration': '483.75 us', 'FLOPS': '24.39 GFLOPS', 'flops%': '0.05%', 'macs%': '0.00%', 'duration%/allfuncs': '7.57%', 'duration%/e2e': '3.96%'}}, functionals_duration = 6.3 ms,
     (layer): ModuleList(
-      85.05 M, 77.69% Params, 11.17 GMACs, 99.99% MACs, 11.58 ms, 96.95% latency, 1.93 TFLOPS,
+      module = {'param': '85.05 M', 'flops': '22.36 G', 'macs': '11.17 GMACs', 'duration': '11.85 ms', 'FLOPS': '1.89 TFLOPS', 'params%': '77.69%', 'flops%': '99.99%', 'macs%': '99.99%', 'duration%': '97.00%'}, functionals = {'matmul': {'flops': '603.98 M', 'macs': '301.99 MMACs', 'duration': '759.84 us', 'FLOPS': '794.88 GFLOPS', 'flops%': '2.70%', 'macs%': '2.70%', 'duration%/allfuncs': '11.89%', 'duration%/e2e': '6.22%'}, 'softmax': {'flops': '2.36 M', 'macs': '0 MACs', 'duration': '129.94 us', 'FLOPS': '18.16 GFLOPS', 'flops%': '0.01%', 'macs%': '0.00%', 'duration%/allfuncs': '2.03%', 'duration%/e2e': '1.06%'}, 'linear': {'flops': '21.74 G', 'macs': '10.87 GMACs', 'duration': '4.92 ms', 'FLOPS': '4.42 TFLOPS', 'flops%': '97.23%', 'macs%': '97.29%', 'duration%/allfuncs': '77.05%', 'duration%/e2e': '40.29%'}, 'layer_norm': {'flops': '11.8 M', 'macs': '0 MACs', 'duration': '483.75 us', 'FLOPS': '24.39 GFLOPS', 'flops%': '0.05%', 'macs%': '0.00%', 'duration%/allfuncs': '7.57%', 'duration%/e2e': '3.96%'}}, functionals_duration = 6.3 ms,
       (0): BertLayer(
-        7.09 M, 6.47% Params, 931.14 MMACs, 8.33% MACs, 979.66 us, 8.20% latency, 1.9 TFLOPS,
+        module = {'param': '7.09 M', 'flops': '1.86 G', 'macs': '931.14 MMACs', 'duration': '997.3 us', 'FLOPS': '1.87 TFLOPS', 'params%': '6.47%', 'flops%': '8.33%', 'macs%': '8.33%', 'duration%': '8.16%'}, functionals = {'matmul': {'flops': '50.33 M', 'macs': '25.17 MMACs', 'duration': '63.42 us', 'FLOPS': '793.63 GFLOPS', 'flops%': '0.23%', 'macs%': '0.23%', 'duration%/allfuncs': '0.99%', 'duration%/e2e': '0.52%'}, 'softmax': {'flops': '196.61 K', 'macs': '0 MACs', 'duration': '10.97 us', 'FLOPS': '17.93 GFLOPS', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%/allfuncs': '0.17%', 'duration%/e2e': '0.09%'}, 'linear': {'flops': '1.81 G', 'macs': '905.97 MMACs', 'duration': '415.8 us', 'FLOPS': '4.36 TFLOPS', 'flops%': '8.10%', 'macs%': '8.11%', 'duration%/allfuncs': '6.51%', 'duration%/e2e': '3.40%'}, 'layer_norm': {'flops': '983.04 K', 'macs': '0 MACs', 'duration': '39.58 us', 'FLOPS': '24.84 GFLOPS', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%/allfuncs': '0.62%', 'duration%/e2e': '0.32%'}}, functionals_duration = 529.77 us,
         (attention): BertAttention(
-          2.36 M, 2.16% Params, 327.16 MMACs, 2.93% MACs, 727.18 us, 6.09% latency, 900.74 GFLOPS,
+          module = {'param': '2.36 M', 'flops': '655.0 M', 'macs': '327.16 MMACs', 'duration': '742.44 us', 'FLOPS': '882.23 GFLOPS', 'params%': '2.16%', 'flops%': '2.93%', 'macs%': '2.93%', 'duration%': '6.08%'}, functionals = {'matmul': {'flops': '50.33 M', 'macs': '25.17 MMACs', 'duration': '63.42 us', 'FLOPS': '793.63 GFLOPS', 'flops%': '0.23%', 'macs%': '0.23%', 'duration%/allfuncs': '0.99%', 'duration%/e2e': '0.52%'}, 'softmax': {'flops': '196.61 K', 'macs': '0 MACs', 'duration': '10.97 us', 'FLOPS': '17.93 GFLOPS', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%/allfuncs': '0.17%', 'duration%/e2e': '0.09%'}, 'linear': {'flops': '603.98 M', 'macs': '301.99 MMACs', 'duration': '348.57 us', 'FLOPS': '1.73 TFLOPS', 'flops%': '2.70%', 'macs%': '2.70%', 'duration%/allfuncs': '5.46%', 'duration%/e2e': '2.85%'}, 'layer_norm': {'flops': '491.52 K', 'macs': '0 MACs', 'duration': '21.93 us', 'FLOPS': '22.41 GFLOPS', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%/allfuncs': '0.34%', 'duration%/e2e': '0.18%'}}, functionals_duration = 444.89 us,
           (self): BertSelfAttention(
-            1.77 M, 1.62% Params, 251.66 MMACs, 2.25% MACs, 474.93 us, 3.98% latency, 1.06 TFLOPS,
-            (query): Linear(590.59 k, 0.54% Params, 75.5 MMACs, 0.68% MACs, 165.7 us, 1.39% latency, 911.25 GFLOPS, in_features=768, out_features=768, bias=True)
-            (key): Linear(590.59 k, 0.54% Params, 75.5 MMACs, 0.68% MACs, 42.68 us, 0.36% latency, 3.54 TFLOPS, in_features=768, out_features=768, bias=True)
-            (value): Linear(590.59 k, 0.54% Params, 75.5 MMACs, 0.68% MACs, 39.34 us, 0.33% latency, 3.84 TFLOPS, in_features=768, out_features=768, bias=True)
-            (dropout): Dropout(0, 0.00% Params, 0 MACs, 0.00% MACs, 12.87 us, 0.11% latency, 0.0 FLOPS, p=0.1, inplace=False)
+            module = {'param': '1.77 M', 'flops': '503.51 M', 'macs': '251.66 MMACs', 'duration': '487.09 us', 'FLOPS': '1.03 TFLOPS', 'params%': '1.62%', 'flops%': '2.25%', 'macs%': '2.25%', 'duration%': '3.99%'}, functionals = {'matmul': {'flops': '50.33 M', 'macs': '25.17 MMACs', 'duration': '63.42 us', 'FLOPS': '793.63 GFLOPS', 'flops%': '0.23%', 'macs%': '0.23%', 'duration%/allfuncs': '0.99%', 'duration%/e2e': '0.52%'}, 'softmax': {'flops': '196.61 K', 'macs': '0 MACs', 'duration': '10.97 us', 'FLOPS': '17.93 GFLOPS', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%/allfuncs': '0.17%', 'duration%/e2e': '0.09%'}, 'linear': {'flops': '452.98 M', 'macs': '226.49 MMACs', 'duration': '209.81 us', 'FLOPS': '2.16 TFLOPS', 'flops%': '2.03%', 'macs%': '2.03%', 'duration%/allfuncs': '3.28%', 'duration%/e2e': '1.72%'}}, functionals_duration = 284.19 us,
+            (query): Linear(module = {'param': '590.59 k', 'flops': '150.99 M', 'macs': '75.5 MMACs', 'duration': '168.32 us', 'FLOPS': '897.05 GFLOPS', 'params%': '0.54%', 'flops%': '0.68%', 'macs%': '0.68%', 'duration%': '1.38%'}, functionals = {'linear': {'flops': '150.99 M', 'macs': '75.5 MMACs', 'duration': '149.25 us', 'FLOPS': '1.01 TFLOPS', 'flops%': '0.68%', 'macs%': '0.68%', 'duration%/allfuncs': '2.34%', 'duration%/e2e': '1.22%'}}, functionals_duration = 149.25 us, in_features=768, out_features=768, bias=True)
+            (key): Linear(module = {'param': '590.59 k', 'flops': '150.99 M', 'macs': '75.5 MMACs', 'duration': '45.3 us', 'FLOPS': '3.33 TFLOPS', 'params%': '0.54%', 'flops%': '0.68%', 'macs%': '0.68%', 'duration%': '0.37%'}, functionals = {'linear': {'flops': '150.99 M', 'macs': '75.5 MMACs', 'duration': '31.47 us', 'FLOPS': '4.8 TFLOPS', 'flops%': '0.68%', 'macs%': '0.68%', 'duration%/allfuncs': '0.49%', 'duration%/e2e': '0.26%'}}, functionals_duration = 31.47 us, in_features=768, out_features=768, bias=True)
+            (value): Linear(module = {'param': '590.59 k', 'flops': '150.99 M', 'macs': '75.5 MMACs', 'duration': '41.72 us', 'FLOPS': '3.62 TFLOPS', 'params%': '0.54%', 'flops%': '0.68%', 'macs%': '0.68%', 'duration%': '0.34%'}, functionals = {'linear': {'flops': '150.99 M', 'macs': '75.5 MMACs', 'duration': '29.09 us', 'FLOPS': '5.19 TFLOPS', 'flops%': '0.68%', 'macs%': '0.68%', 'duration%/allfuncs': '0.46%', 'duration%/e2e': '0.24%'}}, functionals_duration = 29.09 us, in_features=768, out_features=768, bias=True)
+            (dropout): Dropout(module = {'param': '0', 'flops': '0', 'macs': '0 MACs', 'duration': '13.11 us', 'FLOPS': '0.0 FLOPS', 'params%': '0.00%', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%': '0.11%'}, functionals = {}, functionals_duration = 0.0, p=0.1, inplace=False)
           )
           (output): BertSelfOutput(
-            592.13 k, 0.54% Params, 75.5 MMACs, 0.68% MACs, 234.13 us, 1.96% latency, 647.03 GFLOPS,
-            (dense): Linear(590.59 k, 0.54% Params, 75.5 MMACs, 0.68% MACs, 155.21 us, 1.30% latency, 972.84 GFLOPS, in_features=768, out_features=768, bias=True)
-            (LayerNorm): LayerNorm(1.54 k, 0.00% Params, 0 MACs, 0.00% MACs, 30.52 us, 0.26% latency, 16.11 GFLOPS, (768,), eps=1e-12, elementwise_affine=True)
-            (dropout): Dropout(0, 0.00% Params, 0 MACs, 0.00% MACs, 10.97 us, 0.09% latency, 0.0 FLOPS, p=0.1, inplace=False)
+            module = {'param': '592.13 k', 'flops': '151.49 M', 'macs': '75.5 MMACs', 'duration': '237.7 us', 'FLOPS': '637.29 GFLOPS', 'params%': '0.54%', 'flops%': '0.68%', 'macs%': '0.68%', 'duration%': '1.95%'}, functionals = {'linear': {'flops': '150.99 M', 'macs': '75.5 MMACs', 'duration': '138.76 us', 'FLOPS': '1.09 TFLOPS', 'flops%': '0.68%', 'macs%': '0.68%', 'duration%/allfuncs': '2.17%', 'duration%/e2e': '1.14%'}, 'layer_norm': {'flops': '491.52 K', 'macs': '0 MACs', 'duration': '21.93 us', 'FLOPS': '22.41 GFLOPS', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%/allfuncs': '0.34%', 'duration%/e2e': '0.18%'}}, functionals_duration = 160.69 us,
+            (dense): Linear(module = {'param': '590.59 k', 'flops': '150.99 M', 'macs': '75.5 MMACs', 'duration': '155.45 us', 'FLOPS': '971.35 GFLOPS', 'params%': '0.54%', 'flops%': '0.68%', 'macs%': '0.68%', 'duration%': '1.27%'}, functionals = {'linear': {'flops': '150.99 M', 'macs': '75.5 MMACs', 'duration': '138.76 us', 'FLOPS': '1.09 TFLOPS', 'flops%': '0.68%', 'macs%': '0.68%', 'duration%/allfuncs': '2.17%', 'duration%/e2e': '1.14%'}}, functionals_duration = 138.76 us, in_features=768, out_features=768, bias=True)
+            (LayerNorm): LayerNorm(module = {'param': '1.54 k', 'flops': '491.52 K', 'macs': '0 MACs', 'duration': '35.29 us', 'FLOPS': '13.93 GFLOPS', 'params%': '0.00%', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%': '0.29%'}, functionals = {'layer_norm': {'flops': '491.52 K', 'macs': '0 MACs', 'duration': '21.93 us', 'FLOPS': '22.41 GFLOPS', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%/allfuncs': '0.34%', 'duration%/e2e': '0.18%'}}, functionals_duration = 21.93 us, (768,), eps=1e-12, elementwise_affine=True)
+            (dropout): Dropout(module = {'param': '0', 'flops': '0', 'macs': '0 MACs', 'duration': '10.73 us', 'FLOPS': '0.0 FLOPS', 'params%': '0.00%', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%': '0.09%'}, functionals = {}, functionals_duration = 0.0, p=0.1, inplace=False)
           )
         )
         (intermediate): BertIntermediate(
-          2.36 M, 2.16% Params, 301.99 MMACs, 2.70% MACs, 85.12 us, 0.71% latency, 7.1 TFLOPS,
-          (dense): Linear(2.36 M, 2.16% Params, 301.99 MMACs, 2.70% MACs, 48.4 us, 0.41% latency, 12.48 TFLOPS, in_features=768, out_features=3072, bias=True)
-          (intermediate_act_fn): GELUActivation(0, 0.00% Params, 0 MACs, 0.00% MACs, 19.31 us, 0.16% latency, 0.0 FLOPS, )
+          module = {'param': '2.36 M', 'flops': '603.98 M', 'macs': '301.99 MMACs', 'duration': '85.83 us', 'FLOPS': '7.04 TFLOPS', 'params%': '2.16%', 'flops%': '2.70%', 'macs%': '2.70%', 'duration%': '0.70%'}, functionals = {'linear': {'flops': '603.98 M', 'macs': '301.99 MMACs', 'duration': '35.76 us', 'FLOPS': '16.89 TFLOPS', 'flops%': '2.70%', 'macs%': '2.70%', 'duration%/allfuncs': '0.56%', 'duration%/e2e': '0.29%'}}, functionals_duration = 35.76 us,
+          (dense): Linear(module = {'param': '2.36 M', 'flops': '603.98 M', 'macs': '301.99 MMACs', 'duration': '50.54 us', 'FLOPS': '11.95 TFLOPS', 'params%': '2.16%', 'flops%': '2.70%', 'macs%': '2.70%', 'duration%': '0.41%'}, functionals = {'linear': {'flops': '603.98 M', 'macs': '301.99 MMACs', 'duration': '35.76 us', 'FLOPS': '16.89 TFLOPS', 'flops%': '2.70%', 'macs%': '2.70%', 'duration%/allfuncs': '0.56%', 'duration%/e2e': '0.29%'}}, functionals_duration = 35.76 us, in_features=768, out_features=3072, bias=True)
+          (intermediate_act_fn): GELUActivation(module = {'param': '0', 'flops': '0', 'macs': '0 MACs', 'duration': '19.55 us', 'FLOPS': '0.0 FLOPS', 'params%': '0.00%', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%': '0.16%'}, functionals = {}, functionals_duration = 0.0, )
         )
         (output): BertOutput(
-          2.36 M, 2.16% Params, 301.99 MMACs, 2.70% MACs, 113.01 us, 0.95% latency, 5.35 TFLOPS,
-          (dense): Linear(2.36 M, 2.16% Params, 301.99 MMACs, 2.70% MACs, 42.44 us, 0.36% latency, 14.23 TFLOPS, in_features=3072, out_features=768, bias=True)
-          (LayerNorm): LayerNorm(1.54 k, 0.00% Params, 0 MACs, 0.00% MACs, 27.89 us, 0.23% latency, 17.62 GFLOPS, (768,), eps=1e-12, elementwise_affine=True)
-          (dropout): Dropout(0, 0.00% Params, 0 MACs, 0.00% MACs, 10.49 us, 0.09% latency, 0.0 FLOPS, p=0.1, inplace=False)
+          module = {'param': '2.36 M', 'flops': '604.47 M', 'macs': '301.99 MMACs', 'duration': '118.73 us', 'FLOPS': '5.09 TFLOPS', 'params%': '2.16%', 'flops%': '2.70%', 'macs%': '2.70%', 'duration%': '0.97%'}, functionals = {'linear': {'flops': '603.98 M', 'macs': '301.99 MMACs', 'duration': '31.47 us', 'FLOPS': '19.19 TFLOPS', 'flops%': '2.70%', 'macs%': '2.70%', 'duration%/allfuncs': '0.49%', 'duration%/e2e': '0.26%'}, 'layer_norm': {'flops': '491.52 K', 'macs': '0 MACs', 'duration': '17.64 us', 'FLOPS': '27.86 GFLOPS', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%/allfuncs': '0.28%', 'duration%/e2e': '0.14%'}}, functionals_duration = 49.11 us,
+          (dense): Linear(module = {'param': '2.36 M', 'flops': '603.98 M', 'macs': '301.99 MMACs', 'duration': '44.58 us', 'FLOPS': '13.55 TFLOPS', 'params%': '2.16%', 'flops%': '2.70%', 'macs%': '2.70%', 'duration%': '0.36%'}, functionals = {'linear': {'flops': '603.98 M', 'macs': '301.99 MMACs', 'duration': '31.47 us', 'FLOPS': '19.19 TFLOPS', 'flops%': '2.70%', 'macs%': '2.70%', 'duration%/allfuncs': '0.49%', 'duration%/e2e': '0.26%'}}, functionals_duration = 31.47 us, in_features=3072, out_features=768, bias=True)
+          (LayerNorm): LayerNorm(module = {'param': '1.54 k', 'flops': '491.52 K', 'macs': '0 MACs', 'duration': '30.04 us', 'FLOPS': '16.36 GFLOPS', 'params%': '0.00%', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%': '0.25%'}, functionals = {'layer_norm': {'flops': '491.52 K', 'macs': '0 MACs', 'duration': '17.64 us', 'FLOPS': '27.86 GFLOPS', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%/allfuncs': '0.28%', 'duration%/e2e': '0.14%'}}, functionals_duration = 17.64 us, (768,), eps=1e-12, elementwise_affine=True)
+          (dropout): Dropout(module = {'param': '0', 'flops': '0', 'macs': '0 MACs', 'duration': '10.49 us', 'FLOPS': '0.0 FLOPS', 'params%': '0.00%', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%': '0.09%'}, functionals = {}, functionals_duration = 0.0, p=0.1, inplace=False)
         )
       )
-      (1): BertLayer(...)
       ...
       (11): BertLayer(...)
+    )
   )
   (pooler): BertPooler(
-    590.59 k, 0.54% Params, 589.82 KMACs, 0.01% MACs, 91.08 us, 0.76% latency, 12.95 GFLOPS,
-    (dense): Linear(590.59 k, 0.54% Params, 589.82 KMACs, 0.01% MACs, 42.2 us, 0.35% latency, 27.95 GFLOPS, in_features=768, out_features=768, bias=True)
-    (activation): Tanh(0, 0.00% Params, 0 MACs, 0.00% MACs, 22.17 us, 0.19% latency, 0.0 FLOPS, )
+    module = {'param': '590.59 k', 'flops': '1.18 M', 'macs': '589.82 KMACs', 'duration': '92.98 us', 'FLOPS': '12.69 GFLOPS', 'params%': '0.54%', 'flops%': '0.01%', 'macs%': '0.01%', 'duration%': '0.76%'}, functionals = {'linear': {'flops': '1.18 M', 'macs': '589.82 KMACs', 'duration': '29.09 us', 'FLOPS': '40.56 GFLOPS', 'flops%': '0.01%', 'macs%': '0.01%', 'duration%/allfuncs': '0.46%', 'duration%/e2e': '0.24%'}}, functionals_duration = 29.09 us,
+    (dense): Linear(module = {'param': '590.59 k', 'flops': '1.18 M', 'macs': '589.82 KMACs', 'duration': '43.87 us', 'FLOPS': '26.89 GFLOPS', 'params%': '0.54%', 'flops%': '0.01%', 'macs%': '0.01%', 'duration%': '0.36%'}, functionals = {'linear': {'flops': '1.18 M', 'macs': '589.82 KMACs', 'duration': '29.09 us', 'FLOPS': '40.56 GFLOPS', 'flops%': '0.01%', 'macs%': '0.01%', 'duration%/allfuncs': '0.46%', 'duration%/e2e': '0.24%'}}, functionals_duration = 29.09 us, in_features=768, out_features=768, bias=True)
+    (activation): Tanh(module = {'param': '0', 'flops': '0', 'macs': '0 MACs', 'duration': '20.74 us', 'FLOPS': '0.0 FLOPS', 'params%': '0.00%', 'flops%': '0.00%', 'macs%': '0.00%', 'duration%': '0.17%'}, functionals = {}, functionals_duration = 0.0, )
   )
 )
 ------------------------------------------------------------------------------
@@ -258,7 +265,3 @@ for step, batch in enumerate(data_loader):
   optimizer.step()
 
 ```
-
-### Usage With the DeepSpeed Runtime
-
-Refer to [DeepSpeed Flops Profiler](https://www.deepspeed.ai/tutorials/flops-profiler/) for details.
