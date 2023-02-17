@@ -169,9 +169,10 @@ Thus the Flops Profiler allows for customized modules in the model, e.g., ```Par
 
 ## Multi-device, Multi-node, Data Parallelism, and Model Parallelism
 
-The Flops Profiler outputs the per device profile as well as the world size, data parallel size, and model parallel size.                                          1
-For models running on multi-device or multi-node, only change of the model parallelism (e.g. ```--model-parallel-size``` in [Megatron-LM](https://github.com/NVIDIA/Megatron-LM)) affects the number of flops and parameters profiled, i.e.,
-`model_parallel_size * flops = total_flops` and `model_parallel_size * parameters = total_parameters`. The data parallel size or world size (related to the number of GPUs or nodes) does not affect the per device profile.
+The Flops Profiler outputs the **PER DEVICE** profile. When initialized with a distributed runtime where world size(`world_size`), data parallel size(`dp_world_size`), and model parallel size(`mp_world_size`) are defined, the profiler uses this information; otherwise they are default to `1` in flops calcuation. See `ds_engine` in source code as a reference.                                       1
+Note that for models running on multi-device or multi-node, only change of the model parallelism (e.g. ```--model-parallel-size``` in [Megatron-LM](https://github.com/NVIDIA/Megatron-LM)) affects the number of flops and parameters profiled, i.e.,
+`model_parallel_size * flops = total_flops` and `model_parallel_size * parameters = total_parameters`.
+The data parallel size or world size (related to the number of GPUs or nodes) does not affect the per device profile.
 
 ## Usage
 ### In Model Inference
@@ -227,7 +228,7 @@ Below is an example of this usage in a typical training workflow.
 from flops_profiler import FlopsProfiler
 
 model = Model()
-prof = FlopsProfiler(model)
+prof = FlopsProfiler(model, ds_engine if ds_engine else None)
 
 profile_step = 5
 print_profile= True
