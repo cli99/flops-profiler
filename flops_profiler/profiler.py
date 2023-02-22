@@ -346,12 +346,13 @@ class FlopsProfiler:
                     self.ds_engine.mp_world_size,
                 ),
             )
-            print(
-                '{:<60}  {:<8}'.format(
-                    'batch size per device: ',
-                    self.ds_engine.train_micro_batch_size_per_gpu(),
-                ),
-            )
+            if self.ds_engine and hasattr(self.ds_engine, 'train_micro_batch_size_per_gpu'):
+                print(
+                    '{:<60}  {:<8}'.format(
+                        'batch size per device: ',
+                        self.ds_engine.train_micro_batch_size_per_gpu(),
+                    ),
+                )
 
         print(
             '{:<60}  {:<8}'.format(
@@ -391,24 +392,25 @@ class FlopsProfiler:
         )
 
         fwd_latency = self.get_total_duration()
-        if self.ds_engine and self.ds_engine.wall_clock_breakdown():
-            fwd_latency = self.ds_engine.timers(
-                'forward',
-            ).elapsed(False) / 1000.0
-        print(
-            '{:<60}  {:<8}'.format(
-                'fwd latency: ',
-                _duration_to_string(fwd_latency),
-            ),
-        )
-        print(
-            '{:<60}  {:<8}'.format(
-                'fwd FLOPS per device = fwd flops per device / fwd latency: ',
-                _flops_to_string(total_flops / fwd_latency),
-            ),
-        )
+        if fwd_latency:
+            if self.ds_engine and hasattr(self.ds_engine, 'wall_clock_breakdown') and self.ds_engine.wall_clock_breakdown():
+                fwd_latency = self.ds_engine.timers(
+                    'forward',
+                ).elapsed(False) / 1000.0
+            print(
+                '{:<60}  {:<8}'.format(
+                    'fwd latency: ',
+                    _duration_to_string(fwd_latency),
+                ),
+            )
+            print(
+                '{:<60}  {:<8}'.format(
+                    'fwd FLOPS per device = fwd flops per device / fwd latency: ',
+                    _flops_to_string(total_flops / fwd_latency),
+                ),
+            )
 
-        if self.ds_engine and self.ds_engine.wall_clock_breakdown():
+        if self.ds_engine and hasattr(self.ds_engine, 'wall_clock_breakdown') and self.ds_engine.wall_clock_breakdown():
             bwd_latency = self.ds_engine.timers(
                 'backward',
             ).elapsed(False) / 1000.0
@@ -458,14 +460,15 @@ class FlopsProfiler:
                 ),
             )
 
-            samples_per_iter = self.ds_engine.train_micro_batch_size_per_gpu(
-            ) * self.ds_engine.world_size
-            print(
-                '{:<60}  {:<8.2f}'.format(
-                    'samples/second: ',
-                    samples_per_iter / iter_latency,
-                ),
-            )
+            if self.ds_engine and hasattr(self.ds_engine, 'train_micro_batch_size_per_gpu'):
+                samples_per_iter = self.ds_engine.train_micro_batch_size_per_gpu(
+                ) * self.ds_engine.world_size
+                print(
+                    '{:<60}  {:<8.2f}'.format(
+                        'samples/second: ',
+                        samples_per_iter / iter_latency,
+                    ),
+                )
 
         def flops_repr(module):
             mod_params = module.__params__
@@ -955,6 +958,7 @@ def _tensor_addmm_flops_compute(self, mat1, mat2, *, beta=1, alpha=1, out=None):
 
 
 def _mul_flops_compute(input, other, *, out=None):
+    print(f'XXXXXXXXXXXXXXX in _mul_flops_compute')
     return _elementwise_flops_compute(input, other)
 
 
