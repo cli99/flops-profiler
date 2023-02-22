@@ -27,7 +27,7 @@ Similar to  [DeepSpeed Flops Profiler](https://github.com/microsoft/DeepSpeed) a
 Install the flops profiler by
 
 ```sh
-pip install flops_profiler
+pip install flops-profiler
 ```
 
 ## Overview
