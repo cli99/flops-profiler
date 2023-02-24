@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "flops-profiler"
-version = "0.1.0"
+version = "0.1.1"
 description = "Measures the parameters, latency, and floating-point operations of PyTorch model."
 authors = ["Cheng Li <pistasable@gmail.com>"]
 readme = "README.md"
