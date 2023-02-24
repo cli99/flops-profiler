@@ -22,7 +22,7 @@
 
 Similar to  [DeepSpeed Flops Profiler](https://github.com/microsoft/DeepSpeed) but more verbose, runs on both CPU and GPU, and explicitly shows all intra-module functional information at module level.
 
-Note that the latency measurement on GPU requires `torch.cuda.synchronize()` and incurs timing overhead: the timmings of the funtionals (topper modules' functional information are direct aggregations of the lower module's) are accurate while the module timings (captured with forward hooks) have overhead. Check the code for timing details.
+Note that the latency measurement on GPU requires `torch.cuda.synchronize()` and incurs timing overhead: the timings of the funtionals (topper modules' functional information are direct aggregations of the lower module's) are accurate while the module timings (captured with forward hooks) have overhead. Check the code for timing details.
 
 ## Install
 
