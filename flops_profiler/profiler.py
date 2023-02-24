@@ -21,7 +21,7 @@ module_flop_count = []
 module_mac_count = []
 module_profile_lists = []
 old_functions = {}
-
+cuda_sync=False
 @dataclass
 class profileEntry:
     flops: int = 0,
@@ -66,6 +66,9 @@ class FlopsProfiler:
         self.ds_engine = ds_engine
         self.started = False
         self.func_patched = False
+
+        global cuda_sync
+        cuda_sync = next(model.parameters()).device.type == 'cuda'
 
     def start_profile(self, ignore_list: list[nn.Module]| None = None):
         """Starts profiling.
@@ -127,6 +130,8 @@ class FlopsProfiler:
                 )
 
             def start_time_hook(module, input):
+                if cuda_sync:
+                    torch.cuda.synchronize()
                 module.__start_time__ = time.time()
 
             if not hasattr(module, '__start_time_hook_handle'):
@@ -135,6 +140,8 @@ class FlopsProfiler:
                 )
 
             def end_time_hook(module, input, output):
+                if cuda_sync:
+                    torch.cuda.synchronize()
                 module.__duration__ += time.time() - module.__start_time__
 
             if not hasattr(module, '__end_time_hook_handle__'):
@@ -324,6 +331,7 @@ class FlopsProfiler:
         print(
             '\n-------------------------- Flops Profiler --------------------------',
         )
+        print(f'Profile on Device: {next(self.model.parameters()).device}')
         print(f'Profile Summary at step {profile_step}:')
         print(
             'Notations:\ndata parallel size (dp_size), model parallel size(mp_size),\nnumber of parameters (params), number of multiply-accumulate operations(MACs),\nnumber of floating-point operations (flops), floating-point operations per second (FLOPS),\nfwd latency (forward propagation latency), bwd latency (backward propagation latency),\nstep (weights update latency), iter latency (sum of fwd, bwd and step latency)\n',
@@ -958,7 +966,6 @@ def _tensor_addmm_flops_compute(self, mat1, mat2, *, beta=1, alpha=1, out=None):
 
 
 def _mul_flops_compute(input, other, *, out=None):
-    print(f'XXXXXXXXXXXXXXX in _mul_flops_compute')
     return _elementwise_flops_compute(input, other)
 
 
@@ -992,6 +999,7 @@ def _elementwise_flops_compute(input, other):
 
 
 def _wrapFunc(func, funcFlopCompute):
+    global cuda_sync
     oldFunc = func
     name = func.__str__
     old_functions[name] = oldFunc
@@ -1002,9 +1010,19 @@ def _wrapFunc(func, funcFlopCompute):
             module_flop_count[-1].append((name, flops))
         if module_mac_count and macs:
             module_mac_count[-1].append((name, macs))
-        start = time.time()
+        if cuda_sync:
+            cuda_start = torch.cuda.Event(enable_timing=True)
+            cuda_end = torch.cuda.Event(enable_timing=True)
+            cuda_start.record()
+        else:
+            start = time.time()
         ret = oldFunc(*args, **kwds)
-        duration = time.time() - start
+        if cuda_sync:
+            cuda_end.record()
+            torch.cuda.synchronize()
+            duration = cuda_start.elapsed_time(cuda_end)/1000
+        else:
+            duration = time.time() - start
         if module_profile_lists:
             module_profile_lists[-1].append((func_name, profileEntry(flops, macs, duration)))
         return ret
