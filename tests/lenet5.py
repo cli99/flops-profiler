@@ -41,6 +41,7 @@ class LeNet5(torch.nn.Module):
     def forward(self, x):
         x = self.feature_extractor(x)
         x = torch.flatten(x, 1)
+        x = torch.mul(x, 1.0) # for testing purposes only
         logits = self.classifier(x)
         probs = torch.nn.functional.softmax(logits, dim=1)
         return logits, probs

@@ -1127,6 +1127,7 @@ def _patch_tensor_methods():
     torch.einsum = _wrapFunc(torch.einsum, _einsum_flops_compute)
 
     torch.baddbmm = _wrapFunc(torch.baddbmm, _tensor_addmm_flops_compute)
+    torch.Tensor.baddbmm = _wrapFunc(torch.Tensor.baddbmm, _tensor_addmm_flops_compute)
 
 
 def _reload_functionals():
@@ -1185,7 +1186,7 @@ def _reload_tensor_methods():
     torch.einsum = old_functions[torch.einsum.__str__]
 
     torch.baddbmm = old_functions[torch.baddbmm.__str__]
-
+    torch.Tensor.baddbmm = old_functions[torch.Tensor.baddbmm.__str__]
 
 def _rnn_flops(flops, rnn_module, w_ih, w_hh, input_size):
     # matrix matrix mult ih state and internal state
