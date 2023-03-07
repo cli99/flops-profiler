@@ -6,7 +6,7 @@ authors = ["Cheng Li <pistasable@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.10"
+python = "^3.8"
 importlib-metadata = "^6.0.0"
 
 [tool.poetry.dev-dependencies]
