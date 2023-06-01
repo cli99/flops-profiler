@@ -197,7 +197,7 @@ The following example shows how to profile AlexNet using the Flops Profiler.
 ```python
 import torchvision.models as models
 import torch
-from flops_profiler import get_model_profile
+from flops_profiler.profiler import get_model_profile
 
 with torch.cuda.device(0):
     model = models.alexnet()
@@ -234,7 +234,7 @@ The `FlopsProfiler`class provides the following methods:
 Below is an example of this usage in a typical training workflow.
 
 ```python
-from flops_profiler import FlopsProfiler
+from flops_profiler.profiler import FlopsProfiler
 
 model = Model()
 prof = FlopsProfiler(model, ds_engine if ds_engine else None)
